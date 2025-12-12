@@ -1,10 +1,11 @@
 # Sitemap-QA
-
-> **Automated sitemap analysis for QA teams** — Detect test/qa/dev/staging URLs, admin paths, sensitive parameters, and URLs that shouldn't be publicly indexed.
-
++
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://www.typescriptlang.org/)
+[![npm version](https://img.shields.io/npm/v/@akotliar/sitemap-qa/alpha.svg)](https://www.npmjs.com/package/@akotliar/sitemap-qa)
+
+> ⚠️ **Alpha Release** — This tool is currently in active development. Features and APIs may change. Feedback and contributions are welcome!
 
 Sitemap-QA is a command-line tool that automatically discovers, parses, and analyzes website sitemaps to identify potential quality issues, security risks, and configuration problems. Built for QA teams to validate deployments, catch environment leakage, and identify URLs that shouldn't be publicly indexed.
 
@@ -29,7 +30,8 @@ Perfect for CI/CD pipelines, pre-release validation, and security audits.
 ### Installation
 
 ```bash
-npm install -g sitemap-qa
+# Install the alpha version globally
+npm install -g @akotliar/sitemap-qa@alpha
 ```
 
 ### Basic Usage
@@ -117,7 +119,7 @@ The HTML report provides an interactive, visually appealing view with:
 ## 🛠️ CLI Options
 
 ```
-Usage: sitemap-qa analyze [options] <url>
+Usage: sitemap-qa analyze <url> [options]
 
 Analyze a website's sitemap for quality issues
 
