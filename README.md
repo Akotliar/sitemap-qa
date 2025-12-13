@@ -1,5 +1,5 @@
 # Sitemap-QA
-+
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)](package.json)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://www.typescriptlang.org/)
@@ -70,7 +70,6 @@ sitemap-qa analyze https://example.com --verbose
 | **Protocol Inconsistency** | Medium | HTTP URLs in HTTPS sitemaps | ❌ Always detected |
 | **Domain Mismatch** | Medium | Different domains in sitemap | ❌ Always detected |
 
-**Note:** Admin path patterns now properly match URLs with query parameters (e.g., `/admin?id=123`).
 
 ### Output Formats
 
