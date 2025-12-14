@@ -19,14 +19,15 @@ export async function extractAllUrls(
   const allErrors: string[] = [];
   let sitemapsProcessed = 0;
   let sitemapsFailed = 0;
+  let completedCount = 0; // Track completed sitemaps atomically
 
   if (config.verbose) {
     console.log(`\nExtracting URLs from ${sitemapUrls.length} sitemap(s)...`);
   }
 
   // Process sitemaps in parallel with configurable concurrency
-  const CONCURRENCY = config.parsingConcurrency || 25;  // Optimized for modern CPUs
-  const results = await processInBatches(sitemapUrls, CONCURRENCY, async (sitemapUrl, index) => {
+  const CONCURRENCY = config.parsingConcurrency || 50;  // Optimized for network-bound I/O
+  const results = await processInBatches(sitemapUrls, CONCURRENCY, async (sitemapUrl) => {
     try {
       if (config.verbose) {
         console.log(`Extracting URLs from: ${sitemapUrl}`);
@@ -51,9 +52,10 @@ export async function extractAllUrls(
         console.log(`  ✓ Extracted ${parseResult.urls.length} URLs from ${sitemapUrl}`);
       }
 
-      // Report progress
+      // Report progress with atomic counter
       if (onProgress) {
-        onProgress(index + 1, sitemapUrls.length);
+        completedCount++;
+        onProgress(completedCount, sitemapUrls.length);
       }
 
       return {
@@ -68,6 +70,12 @@ export async function extractAllUrls(
 
       if (config.verbose) {
         console.error(`  ✗ ${errorMsg}`);
+      }
+
+      // Report progress even on failure
+      if (onProgress) {
+        completedCount++;
+        onProgress(completedCount, sitemapUrls.length);
       }
 
       return {
@@ -112,14 +120,14 @@ export async function extractAllUrls(
 async function processInBatches<T, R>(
   items: T[],
   concurrency: number,
-  processor: (item: T, index: number) => Promise<R>
+  processor: (item: T) => Promise<R>
 ): Promise<R[]> {
   const results: R[] = [];
   
   for (let i = 0; i < items.length; i += concurrency) {
     const batch = items.slice(i, i + concurrency);
     const batchResults = await Promise.all(
-      batch.map((item, batchIndex) => processor(item, i + batchIndex))
+      batch.map((item) => processor(item))
     );
     results.push(...batchResults);
   }

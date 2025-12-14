@@ -10,8 +10,10 @@ export default defineConfig({
   splitting: false,
   sourcemap: true,
   clean: true,
-  minify: true,
+  minify: false,
   shims: true,
+  platform: 'node',
+  external: ['cli-progress'],
   define: {
     '__PACKAGE_VERSION__': JSON.stringify(packageJson.version),
   },
