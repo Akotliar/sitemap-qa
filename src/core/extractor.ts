@@ -12,7 +12,8 @@ export interface ExtractionResult {
 
 export async function extractAllUrls(
   sitemapUrls: string[],
-  config: Config
+  config: Config,
+  onProgress?: (completed: number, total: number) => void
 ): Promise<ExtractionResult> {
   const allUrls: UrlEntry[] = [];
   const allErrors: string[] = [];
@@ -23,9 +24,9 @@ export async function extractAllUrls(
     console.log(`\nExtracting URLs from ${sitemapUrls.length} sitemap(s)...`);
   }
 
-  // Process sitemaps in parallel with concurrency limit
-  const CONCURRENCY = 10; // Process 10 sitemaps at a time
-  const results = await processInBatches(sitemapUrls, CONCURRENCY, async (sitemapUrl) => {
+  // Process sitemaps in parallel with configurable concurrency
+  const CONCURRENCY = config.parsingConcurrency || 25;  // Optimized for modern CPUs
+  const results = await processInBatches(sitemapUrls, CONCURRENCY, async (sitemapUrl, index) => {
     try {
       if (config.verbose) {
         console.log(`Extracting URLs from: ${sitemapUrl}`);
@@ -40,19 +41,24 @@ export async function extractAllUrls(
       // Parse sitemap XML
       const parseResult = await parseSitemap(response.content, sitemapUrl);
 
-      // Add extraction timestamp to each URL
-      const urlsWithTimestamp = parseResult.urls.map((url) => ({
-        ...url,
-        extractedAt: new Date().toISOString(),
-      }));
+      // Add extraction timestamp to each URL (optimized: single timestamp for batch)
+      const extractedAt = new Date().toISOString();
+      parseResult.urls.forEach(url => {
+        url.extractedAt = extractedAt;
+      });
 
       if (config.verbose) {
         console.log(`  ✓ Extracted ${parseResult.urls.length} URLs from ${sitemapUrl}`);
       }
 
+      // Report progress
+      if (onProgress) {
+        onProgress(index + 1, sitemapUrls.length);
+      }
+
       return {
         success: true,
-        urls: urlsWithTimestamp,
+        urls: parseResult.urls,
         errors: parseResult.errors,
       };
     } catch (error) {
@@ -106,13 +112,15 @@ export async function extractAllUrls(
 async function processInBatches<T, R>(
   items: T[],
   concurrency: number,
-  processor: (item: T) => Promise<R>
+  processor: (item: T, index: number) => Promise<R>
 ): Promise<R[]> {
   const results: R[] = [];
   
   for (let i = 0; i < items.length; i += concurrency) {
     const batch = items.slice(i, i + concurrency);
-    const batchResults = await Promise.all(batch.map(processor));
+    const batchResults = await Promise.all(
+      batch.map((item, batchIndex) => processor(item, i + batchIndex))
+    );
     results.push(...batchResults);
   }
   

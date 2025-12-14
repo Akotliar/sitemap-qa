@@ -25,6 +25,8 @@ interface AnalyzeOptions {
   color: boolean;
   verbose: boolean;
   acceptedPatterns?: string;
+  concurrency?: string;
+  batchSize?: string;
 }
 
 interface AnalysisPipelineResult {
@@ -45,6 +47,8 @@ export const analyzeCommand = new Command('analyze')
   .option('--output-dir <path>', 'Output directory for reports')
   .option('--output-file <path>', 'Custom output filename')
   .option('--accepted-patterns <patterns>', 'Comma-separated regex patterns to exclude from risk detection')
+  .option('--concurrency <number>', 'Number of concurrent workers for risk detection')
+  .option('--batch-size <number>', 'URLs per batch for risk detection', '10000')
   .option('--no-color', 'Disable ANSI color codes in CLI output')
   .option('--verbose', 'Enable verbose logging', false)
   .action(async (url: string, options: AnalyzeOptions) => {
@@ -59,6 +63,8 @@ export const analyzeCommand = new Command('analyze')
         ...options,
         baseUrl: url,
         outputFormat: options.output,
+        riskDetectionConcurrency: options.concurrency ? parseInt(options.concurrency) : undefined,
+        riskDetectionBatchSize: options.batchSize ? parseInt(options.batchSize) : undefined,
       });
       config = loadedConfig;
       
