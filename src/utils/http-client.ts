@@ -1,5 +1,31 @@
 import { NetworkError, HttpError } from '@/errors/network-errors';
 import { chromium } from 'playwright';
+import axios from 'axios';
+import { Agent as HttpAgent } from 'http';
+import { Agent as HttpsAgent } from 'https';
+
+// Create persistent HTTP agents for connection pooling
+const httpAgent = new HttpAgent({ 
+  keepAlive: true, 
+  maxSockets: 200,  // Allow many concurrent connections
+  maxFreeSockets: 50,
+  timeout: 15000
+});
+
+const httpsAgent = new HttpsAgent({ 
+  keepAlive: true, 
+  maxSockets: 200,
+  maxFreeSockets: 50,
+  timeout: 15000
+});
+
+// Create axios instance with connection pooling
+const axiosInstance = axios.create({
+  httpAgent,
+  httpsAgent,
+  maxRedirects: 5,
+  validateStatus: () => true // Don't throw on any status code
+});
 
 
 export interface FetchOptions {
@@ -7,6 +33,7 @@ export interface FetchOptions {
   maxRetries?: number;     // Maximum retry attempts (default: 3)
   retryDelay?: number;     // Initial retry delay in ms (default: 1000)
   useBrowser?: boolean;    // Force use of headless browser (default: auto-detect on 403)
+  disableBrowserFallback?: boolean; // Disable automatic browser fallback (for bulk operations)
 }
 
 export interface FetchResult {
@@ -122,7 +149,8 @@ export async function fetchUrl(
     timeout = 30,
     maxRetries = 3,
     retryDelay = 1000,
-    useBrowser = false
+    useBrowser = false,
+    disableBrowserFallback = false
   } = options;
 
   // Validate URL before starting retry loop
@@ -140,36 +168,31 @@ export async function fetchUrl(
         return await fetchUrlWithBrowser(url, timeout);
       }
       
-      // Use fetch with automatic redirect following
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout * 1000);
-      
-      const response = await fetch(url, {
-        method: 'GET',
+      // Use axios with connection pooling for better performance
+      const response = await axiosInstance.get(url, {
+        timeout: timeout * 1000,
         headers: {
-          'User-Agent': 'sitemap-qa/1.0.0',
-          'Accept': 'text/xml,application/xml,text/plain,*/*'
-        },
-        signal: controller.signal,
-        redirect: 'follow'  // Follow redirects automatically (default behavior)
+          'User-Agent': 'sitemap-qa/1.0.0 (compatible; +https://github.com/Akotliar/sitemap-qa)',
+          'Accept': 'text/xml,application/xml,text/plain,*/*',
+          'Accept-Encoding': 'gzip, deflate',
+          'Connection': 'keep-alive'
+        }
       });
       
-      clearTimeout(timeoutId);
-      
       const statusCode = response.status;
-      const body = await response.text();
+      const body = response.data;
       
       // Success - return result
       if (statusCode >= 200 && statusCode < 300) {
         return {
-          content: body,
+          content: typeof body === 'string' ? body : JSON.stringify(body),
           statusCode: statusCode,
-          url: response.url  // Final URL after redirects
+          url: response.request?.res?.responseUrl || url  // Final URL after redirects
         };
       }
       
-      // If we get 403, try with browser on next attempt
-      if (statusCode === 403 && !attemptedBrowser) {
+      // If we get 403, try with browser on next attempt (unless disabled)
+      if (statusCode === 403 && !attemptedBrowser && !disableBrowserFallback) {
         attemptedBrowser = true;
         // Silently retry with headless browser
         continue; // Retry immediately with browser
@@ -177,11 +200,11 @@ export async function fetchUrl(
       
       // Non-retryable error - throw immediately
       if (!retryableStatuses.includes(statusCode)) {
-        throw new HttpError(response.url, statusCode);
+        throw new HttpError(response.request?.res?.responseUrl || url, statusCode);
       }
       
       // Retryable error - continue to next attempt
-      lastError = new HttpError(response.url, statusCode);
+      lastError = new HttpError(response.request?.res?.responseUrl || url, statusCode);
       
     } catch (error: any) {
       // Already formatted HttpError - rethrow if non-retryable

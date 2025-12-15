@@ -6,12 +6,33 @@ import type { Config } from '@/types/config';
 
 // Version is injected at build time by tsup
 declare const __PACKAGE_VERSION__: string;
-const TOOL_VERSION = __PACKAGE_VERSION__;
+const TOOL_VERSION = typeof __PACKAGE_VERSION__ !== 'undefined' ? __PACKAGE_VERSION__ : 'dev';
+
+export interface PhaseTiming {
+  name: string;
+  startTime: number;
+  endTime: number;
+  duration: number;
+}
+
+export interface PerformanceMetrics {
+  totalExecutionTimeMs: number;
+  phaseTimings: Record<string, number>;
+  throughput?: {
+    urlsPerSecond: number;
+    sitemapsPerSecond: number;
+  };
+  resourceUsage?: {
+    peakMemoryMb?: number;
+    cpuCoresUsed?: number;
+  };
+}
 
 export interface JsonReporterOptions {
   pretty?: boolean;           // Pretty-print with indentation (default: true)
   indent?: number;            // Indentation spaces (default: 2)
   includeMetadata?: boolean;  // Include generation metadata (default: true)
+  performanceMetrics?: PerformanceMetrics; // Performance timing data
 }
 
 export interface ParseResult {
@@ -84,6 +105,7 @@ export function generateJsonReport(
   const {
     pretty = true,
     indent = 2,
+    performanceMetrics,
   } = options;
   
   const result = buildAnalysisResult(
@@ -95,7 +117,7 @@ export function generateJsonReport(
     startTime
   );
   
-  const jsonOutput = transformToJsonOutput(result);
+  const jsonOutput = transformToJsonOutput(result, performanceMetrics);
   
   if (pretty) {
     return JSON.stringify(jsonOutput, null, indent);
@@ -222,8 +244,8 @@ function determineOverallStatus(
 /**
  * Transform internal camelCase structure to external snake_case JSON
  */
-function transformToJsonOutput(result: AnalysisResult): object {
-  return {
+function transformToJsonOutput(result: AnalysisResult, performanceMetrics?: PerformanceMetrics): object {
+  const output: any = {
     analysis_metadata: transformMetadata(result.analysisMetadata),
     sitemaps_discovered: result.sitemapsDiscovered,
     total_url_count: result.totalUrlCount,
@@ -233,6 +255,18 @@ function transformToJsonOutput(result: AnalysisResult): object {
     summary: transformSummary(result.summary),
     errors: result.errors
   };
+  
+  // Add performance metrics if provided
+  if (performanceMetrics) {
+    output.performance_metrics = {
+      total_execution_time_ms: performanceMetrics.totalExecutionTimeMs,
+      phase_timings: performanceMetrics.phaseTimings,
+      throughput: performanceMetrics.throughput,
+      resource_usage: performanceMetrics.resourceUsage
+    };
+  }
+  
+  return output;
 }
 
 /**

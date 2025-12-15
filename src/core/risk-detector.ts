@@ -5,6 +5,8 @@ import { ENVIRONMENT_PATTERNS, createDomainMismatchPattern } from '@/core/patter
 import { ADMIN_PATH_PATTERNS, SENSITIVE_PARAM_PATTERNS, INTERNAL_CONTENT_PATTERNS } from '@/core/patterns/admin-patterns';
 import { sanitizeUrl } from '@/utils/sanitizer';
 import { groupRiskFindings, RiskGroup } from '@/core/risk-grouper';
+import { chunkArray, processInBatches } from '@/utils/batch-processor';
+import os from 'os';
 
 export type RiskCategory = 
   | 'environment_leakage'
@@ -46,27 +48,17 @@ export interface RiskDetectionResult {
   processingTimeMs: number;
 }
 
-export async function detectRisks(
-  urls: UrlEntry[],
-  baseUrl: string,
-  config: Config
-): Promise<RiskDetectionResult> {
-  const startTime = Date.now();
-  const findings: RiskFinding[] = [];
+interface BatchResult {
+  findings: RiskFinding[];
+  urlsProcessed: number;
+}
+
+/**
+ * Compile accepted patterns from config
+ */
+function compileAcceptedPatterns(config: Config): RegExp[] {
+  const patterns: RegExp[] = [];
   
-  // Add dynamic domain mismatch pattern and all other patterns
-  const domainPattern = createDomainMismatchPattern(baseUrl);
-  const allPatterns = [
-    ...RISK_PATTERNS,
-    ...ENVIRONMENT_PATTERNS,
-    ...ADMIN_PATH_PATTERNS,
-    ...SENSITIVE_PARAM_PATTERNS,
-    ...INTERNAL_CONTENT_PATTERNS,
-    domainPattern
-  ];
-  
-  // Compile accepted patterns
-  const acceptedPatterns: RegExp[] = [];
   if (config.acceptedPatterns && config.acceptedPatterns.length > 0) {
     for (const pattern of config.acceptedPatterns) {
       try {
@@ -83,7 +75,7 @@ export async function detectRisks(
           regexPattern = regexPattern + '(?:/|$|\\?|#)';
         }
         
-        acceptedPatterns.push(new RegExp(regexPattern, 'i'));
+        patterns.push(new RegExp(regexPattern, 'i'));
       } catch (error) {
         if (config.verbose) {
           console.warn(`Invalid accepted pattern: ${pattern}`);
@@ -92,41 +84,26 @@ export async function detectRisks(
     }
   }
   
-  if (config.verbose) {
-    console.log(`\nAnalyzing ${urls.length} URLs for risk patterns...`);
-    try {
-      console.log(`Base domain: ${new URL(baseUrl).hostname}`);
-    } catch (error) {
-      console.log(`Base URL: ${baseUrl}`);
-    }
-    if (acceptedPatterns.length > 0) {
-      console.log(`Accepted patterns: ${acceptedPatterns.length}`);
-    }
-  }
-  
-  // Determine expected protocol from base URL
-  let expectedProtocol: string;
-  try {
-    expectedProtocol = new URL(baseUrl).protocol;
-  } catch (error) {
-    if (config.verbose) {
-      console.warn(`Invalid base URL: ${baseUrl}, defaulting to https:`);
-    }
-    expectedProtocol = 'https:';
-  }
-  
-  let processed = 0;
+  return patterns;
+}
+
+/**
+ * Process a single batch of URLs for risk detection
+ * (Called in parallel for multiple batches)
+ */
+async function detectRisksInBatch(
+  urls: UrlEntry[],
+  allPatterns: RiskPattern[],
+  acceptedPatterns: RegExp[],
+  expectedProtocol: string,
+  verbose: boolean
+): Promise<BatchResult> {
+  const findings: RiskFinding[] = [];
   
   for (const urlEntry of urls) {
     const url = urlEntry.loc;
-    processed++;
     
-    // Progress tracking every 10k URLs with in-place update
-    if (processed % 10000 === 0 || processed === urls.length) {
-      process.stdout.write(`\r\x1b[K  Analyzing: ${processed.toLocaleString()}/${urls.length.toLocaleString()} URLs...`);
-    }
-    
-    // Check if URL matches accepted patterns
+    // Check if URL matches accepted patterns (early exit)
     let isAccepted = false;
     for (const acceptedPattern of acceptedPatterns) {
       if (acceptedPattern.test(url)) {
@@ -134,10 +111,7 @@ export async function detectRisks(
         break;
       }
     }
-    
-    if (isAccepted) {
-      continue; // Skip accepted URLs
-    }
+    if (isAccepted) continue;
     
     // Test each pattern against the URL
     for (const pattern of allPatterns) {
@@ -157,9 +131,6 @@ export async function detectRisks(
           }
         } catch (error) {
           // Invalid URL - skip
-          if (config.verbose) {
-            console.warn(`Skipping invalid URL: ${url}`);
-          }
           continue;
         }
       } else {
@@ -177,7 +148,7 @@ export async function detectRisks(
             });
           }
         } catch (error) {
-          if (config.verbose) {
+          if (verbose) {
             console.error(`Pattern matching failed for ${pattern.name}: ${error instanceof Error ? error.message : String(error)}`);
           }
           continue;
@@ -186,24 +157,106 @@ export async function detectRisks(
     }
   }
   
-  // Clear progress line
-  if (urls.length >= 10000) {
-    process.stdout.write('\r\x1b[K');
+  return { findings, urlsProcessed: urls.length };
+}
+
+export async function detectRisks(
+  urls: UrlEntry[],
+  baseUrl: string,
+  config: Config
+): Promise<RiskDetectionResult> {
+  const startTime = Date.now();
+  
+  // Pre-compile ALL patterns ONCE (not per batch)
+  const domainPattern = createDomainMismatchPattern(baseUrl);
+  const allPatterns = [
+    ...RISK_PATTERNS,
+    ...ENVIRONMENT_PATTERNS,
+    ...ADMIN_PATH_PATTERNS,
+    ...SENSITIVE_PARAM_PATTERNS,
+    ...INTERNAL_CONTENT_PATTERNS,
+    domainPattern
+  ];
+  
+  // Compile accepted patterns once
+  const acceptedPatterns = compileAcceptedPatterns(config);
+  
+  // Extract protocol once
+  let expectedProtocol: string;
+  try {
+    expectedProtocol = new URL(baseUrl).protocol;
+  } catch (error) {
+    if (config.verbose) {
+      console.warn(`Invalid base URL: ${baseUrl}, defaulting to https:`);
+    }
+    expectedProtocol = 'https:';
   }
   
+  // Configure batch processing
+  const BATCH_SIZE = config.riskDetectionBatchSize || 10000;
+  const CONCURRENCY = config.riskDetectionConcurrency || Math.max(2, os.cpus().length - 1);
+  const batches = chunkArray(urls, BATCH_SIZE);
+  
+  if (config.verbose) {
+    console.log(`\nRisk Detection Configuration:`);
+    console.log(`  - Total URLs: ${urls.length.toLocaleString()}`);
+    console.log(`  - Batch size: ${BATCH_SIZE.toLocaleString()}`);
+    console.log(`  - Concurrency: ${CONCURRENCY}`);
+    console.log(`  - Total batches: ${batches.length}`);
+    try {
+      console.log(`  - Base domain: ${new URL(baseUrl).hostname}`);
+    } catch (error) {
+      console.log(`  - Base URL: ${baseUrl}`);
+    }
+    if (acceptedPatterns.length > 0) {
+      console.log(`  - Accepted patterns: ${acceptedPatterns.length}`);
+    }
+  }
+  
+  // Progress tracking
+  let completedBatches = 0;
+  const totalBatches = batches.length;
+  const batchStartTime = Date.now();
+  
+  // Process batches in parallel with concurrency limit
+  const batchResults = await processInBatches(
+    batches,
+    CONCURRENCY,
+    (batch) => detectRisksInBatch(batch, allPatterns, acceptedPatterns, expectedProtocol, config.verbose),
+    (completed) => {
+      completedBatches = completed;
+      const pct = ((completed / totalBatches) * 100).toFixed(1);
+      const elapsed = (Date.now() - batchStartTime) / 1000;
+      const urlsProcessed = completed * BATCH_SIZE;
+      const speed = Math.round(urlsProcessed / elapsed);
+      const remaining = totalBatches - completed;
+      const eta = Math.round((remaining * BATCH_SIZE) / speed);
+      
+      process.stdout.write(
+        `\r\x1b[K  Analyzing batch ${completed}/${totalBatches} (${pct}%) | ETA: ~${eta}s | ${speed.toLocaleString()} URLs/sec`
+      );
+    }
+  );
+  
+  // Clear progress line
+  process.stdout.write('\r\x1b[K');
+  
+  // Merge results from all batches
+  const allFindings = batchResults.flatMap(r => r.findings);
+  
   // Group findings
-  const groupingResult = groupRiskFindings(findings);
+  const groupingResult = groupRiskFindings(allFindings);
   
   const processingTimeMs = Date.now() - startTime;
   
   if (config.verbose) {
-    console.log(`\nRisk Summary:`);
-    console.log(`  - Total URLs analyzed: ${urls.length}`);
-    console.log(`  - Risk URLs found: ${groupingResult.totalRiskUrls}`);
+    console.log(`\nRisk Detection Summary:`);
+    console.log(`  - Total URLs analyzed: ${urls.length.toLocaleString()}`);
+    console.log(`  - Risk URLs found: ${groupingResult.totalRiskUrls.toLocaleString()}`);
     console.log(`  - HIGH severity: ${groupingResult.highSeverityCount}`);
     console.log(`  - MEDIUM severity: ${groupingResult.mediumSeverityCount}`);
     console.log(`  - LOW severity: ${groupingResult.lowSeverityCount}`);
-    console.log(`  - Processing time: ${processingTimeMs}ms`);
+    console.log(`  - Processing time: ${(processingTimeMs / 1000).toFixed(1)}s`);
     
     if (groupingResult.groups.length > 0) {
       console.log(`\nRisk Categories Found:`);
@@ -214,7 +267,7 @@ export async function detectRisks(
   }
   
   return {
-    findings,
+    findings: allFindings,
     groups: groupingResult.groups,
     totalUrlsAnalyzed: urls.length,
     riskUrlCount: groupingResult.totalRiskUrls,

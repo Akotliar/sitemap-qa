@@ -1,5 +1,16 @@
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 
+// Module-level constants for performance optimization
+const VALID_CHANGEFREQ = new Set([
+  'always',
+  'hourly',
+  'daily',
+  'weekly',
+  'monthly',
+  'yearly',
+  'never',
+]);
+
 export interface UrlEntry {
   loc: string; // Required: URL location
   lastmod?: string; // Optional: Last modification date
@@ -36,7 +47,9 @@ function extractUrls(parsedXml: any, sitemapUrl: string): UrlEntry[] {
       ? parsedXml.urlset.url
       : [parsedXml.urlset.url];
 
-    for (const node of urlNodes) {
+    // Use traditional for-loop for better performance
+    for (let i = 0; i < urlNodes.length; i++) {
+      const node = urlNodes[i];
       // Skip entries without loc field
       if (!node || !node.loc) {
         continue;
@@ -101,18 +114,9 @@ export async function parseSitemap(
           }
         }
 
-        // Validate changefreq
+        // Validate changefreq (using Set for O(1) lookup)
         if (entry.changefreq) {
-          const validFreqs = [
-            'always',
-            'hourly',
-            'daily',
-            'weekly',
-            'monthly',
-            'yearly',
-            'never',
-          ];
-          if (!validFreqs.includes(entry.changefreq.toLowerCase())) {
+          if (!VALID_CHANGEFREQ.has(entry.changefreq.toLowerCase())) {
             errors.push(
               `Invalid changefreq "${entry.changefreq}" for ${entry.loc}`
             );
