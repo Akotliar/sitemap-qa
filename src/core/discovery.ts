@@ -82,7 +82,7 @@ async function tryStandardPaths(
       try {
         const result = await fetchUrl(sitemapUrl, { 
           timeout: config.timeout,
-          maxRetries: 1
+          maxRetries: 0  // Don't retry on standard paths - fail fast
         });
         
         if (result.statusCode === 200) {
@@ -272,18 +272,19 @@ async function discoverAllSitemaps(
   const failed = new Set<string>();
   const redirected = new Set<string>();
   let detectedCanonical = canonicalDomain;
-  const BATCH_SIZE = 5; // Process 5 sitemaps concurrently
+  const BATCH_SIZE = config.discoveryConcurrency || 50; // Configurable concurrent processing
   
   while (toProcess.length > 0) {
     // Take a batch of URLs to process concurrently
     const batch = toProcess.splice(0, Math.min(BATCH_SIZE, toProcess.length));
     
-    await Promise.all(batch.map(async (sitemapUrl) => {
+    // Process batch and collect results atomically
+    const batchResults = await Promise.all(batch.map(async (sitemapUrl) => {
       if (processed.has(sitemapUrl)) {
         if (config.verbose) {
           console.warn(`Skipping duplicate sitemap: ${sitemapUrl}`);
         }
-        return;
+        return { type: 'skip' as const };
       }
       
       processed.add(sitemapUrl);
@@ -300,31 +301,26 @@ async function discoverAllSitemaps(
           }
           
           const childUrls = extractSitemapIndexUrls(result.content);
-          toProcess.push(...childUrls);
           
           if (config.verbose) {
             console.log(`  └─ Contains ${childUrls.length} child sitemap(s)`);
           }
-        } else {
-          finalSitemaps.push(sitemapUrl);
           
+          return { type: 'index' as const, childUrls };
+        } else {
           if (config.verbose) {
             console.log(`✓ Discovered sitemap: ${sitemapUrl}`);
           }
+          
+          return { type: 'sitemap' as const, url: sitemapUrl };
         }
         
       } catch (error) {
         // Track failures
         if (error instanceof HttpError && error.statusCode === 301) {
           redirected.add(sitemapUrl);
-        } else {
-          failed.add(sitemapUrl);
-        }
-        
-        if (config.verbose) {
-          const message = error instanceof Error ? error.message : String(error);
           
-          if (error instanceof HttpError && error.statusCode === 301) {
+          if (config.verbose) {
             if (!detectedCanonical) {
               detectedCanonical = await detectCanonicalDomain(baseUrl, config);
               if (config.verbose) {
@@ -345,14 +341,33 @@ async function discoverAllSitemaps(
                 console.warn(`   Fix: Update the sitemap index to reference the final URL after redirect.`);
               }
             } catch {
+              const message = error instanceof Error ? error.message : String(error);
               console.warn(`Failed to fetch sitemap ${sitemapUrl}: ${message}`);
             }
-          } else {
+          }
+          
+          return { type: 'redirect' as const };
+        } else {
+          failed.add(sitemapUrl);
+          
+          if (config.verbose) {
+            const message = error instanceof Error ? error.message : String(error);
             console.warn(`Failed to fetch sitemap ${sitemapUrl}: ${message}`);
           }
+          
+          return { type: 'failed' as const };
         }
       }
     }));
+    
+    // Process results atomically after all promises complete
+    for (const result of batchResults) {
+      if (result.type === 'index') {
+        toProcess.push(...result.childUrls);
+      } else if (result.type === 'sitemap') {
+        finalSitemaps.push(result.url);
+      }
+    }
     
     // Safety check
     if (processed.size > 1000) {

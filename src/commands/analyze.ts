@@ -37,6 +37,7 @@ interface AnalyzeOptions {
   concurrency?: string;
   batchSize?: string;
   parsingConcurrency?: string;
+  discoveryConcurrency?: string;
   silent?: boolean;
   benchmark?: boolean;
 }
@@ -63,6 +64,7 @@ export const analyzeCommand = new Command('analyze')
   .option('--concurrency <number>', 'Number of concurrent workers for risk detection')
   .option('--batch-size <number>', 'URLs per batch for risk detection', '10000')
   .option('--parsing-concurrency <number>', 'Number of concurrent sitemap parsers', '50')
+  .option('--discovery-concurrency <number>', 'Number of concurrent sitemap index fetches', '50')
   .option('--silent', 'Disable all progress output')
   .option('--benchmark', 'Save performance profile')
   .option('--no-color', 'Disable ANSI color codes in CLI output')
@@ -82,6 +84,7 @@ export const analyzeCommand = new Command('analyze')
         riskDetectionConcurrency: options.concurrency ? parseInt(options.concurrency) : undefined,
         riskDetectionBatchSize: options.batchSize ? parseInt(options.batchSize) : undefined,
         parsingConcurrency: options.parsingConcurrency ? parseInt(options.parsingConcurrency) : undefined,
+        discoveryConcurrency: options.discoveryConcurrency ? parseInt(options.discoveryConcurrency) : undefined,
         silent: options.silent,
         benchmark: options.benchmark,
         progressBar: options.progress,
@@ -93,47 +96,12 @@ export const analyzeCommand = new Command('analyze')
       // Run analysis pipeline
       const result = await runAnalysisPipeline(url, config);
       
-      // Show simple CLI summary
-      showCliSummary(result);
-      
       // Create output directory
       await fs.mkdir(config.outputDir, { recursive: true });
       
-      // Always generate HTML report
-      const htmlFileName = options.outputFile || `sitemap-qa-report-${Date.now()}.html`;
-      const htmlFilePath = `${config.outputDir}/${htmlFileName}`;
-      await writeHtmlReport(
-        result.summary,
-        result.discoveryResult,
-        result.totalUrls,
-        config,
-        htmlFilePath,
-        result.errors,
-        { maxUrlsPerGroup: 10 }
-      );
-      console.log(`\n📄 Full report saved to: ${chalk.cyan(htmlFilePath)}`);
-      
-      // Generate JSON if requested
+      // Handle output based on format
       if (options.output === 'json') {
-        const jsonFileName = htmlFileName.replace(/\.html$/, '.json');
-        const jsonFilePath = `${config.outputDir}/${jsonFileName}`;
-        
-        // Prepare performance metrics
-        const performanceMetrics = {
-          totalExecutionTimeMs: result.executionTime,
-          phaseTimings: result.phaseTimings.reduce((acc, p) => {
-            acc[p.name.toLowerCase()] = p.duration;
-            return acc;
-          }, {} as Record<string, number>),
-          throughput: {
-            urlsPerSecond: Math.round((result.totalUrls / result.executionTime) * 1000),
-            sitemapsPerSecond: parseFloat(((result.discoveryResult.sitemaps.length / result.executionTime) * 1000).toFixed(2))
-          },
-          resourceUsage: {
-            cpuCoresUsed: config.riskDetectionConcurrency || os.cpus().length - 1
-          }
-        };
-        
+        // JSON output - print to console and optionally save file
         const jsonReport = generateJsonReport(
           result.summary,
           result.discoveryResult,
@@ -141,10 +109,34 @@ export const analyzeCommand = new Command('analyze')
           result.riskGroups,
           config,
           result.executionTime,
-          { pretty: true, indent: 2, performanceMetrics }
+          { pretty: true, indent: 2 }
         );
-        await fs.writeFile(jsonFilePath, jsonReport, 'utf-8');
-        console.log(`📄 JSON report saved to: ${chalk.cyan(jsonFilePath)}`);
+        
+        // Print JSON to console
+        console.log('\n' + jsonReport);
+        
+        // Also save to file if outputFile is specified
+        if (options.outputFile) {
+          const jsonFilePath = `${config.outputDir}/${options.outputFile}`;
+          await fs.writeFile(jsonFilePath, jsonReport, 'utf-8');
+          console.log(`\n📄 JSON report saved to: ${chalk.cyan(jsonFilePath)}`);
+        }
+      } else {
+        // HTML output (default) - show CLI summary and save HTML report
+        showCliSummary(result);
+        
+        const htmlFileName = options.outputFile || `sitemap-qa-report-${Date.now()}.html`;
+        const htmlFilePath = `${config.outputDir}/${htmlFileName}`;
+        await writeHtmlReport(
+          result.summary,
+          result.discoveryResult,
+          result.totalUrls,
+          config,
+          htmlFilePath,
+          result.errors,
+          { maxUrlsPerGroup: 10 }
+        );
+        console.log(`\n📄 Full report saved to: ${chalk.cyan(htmlFilePath)}`);
       }
       
       // Exit with appropriate code
@@ -180,26 +172,23 @@ function validateAnalyzeOptions(options: AnalyzeOptions): void {
  * Show simple CLI summary
  */
 function showCliSummary(result: AnalysisPipelineResult): void {
-  console.log('');
   const riskyUrlCount = result.summary.categoryInsights.reduce((sum, g) => sum + g.count, 0);
+  
+  // Visual separator
+  console.log(chalk.dim('─'.repeat(50)));
   
   if (riskyUrlCount === 0) {
     console.log(chalk.green('✅ No issues found - sitemap looks clean!'));
   } else {
-    console.log(chalk.yellow(`⚠️  Found ${riskyUrlCount} potentially risky URL(s)`));
-    console.log('');
-    
-    // Show breakdown by severity
+    // Build inline severity summary
     const { high, medium, low } = result.summary.severityBreakdown;
-    if (high > 0) {
-      console.log(chalk.red(`   🚨 High severity:   ${high} URLs`));
-    }
-    if (medium > 0) {
-      console.log(chalk.yellow(`   ⚠️  Medium severity: ${medium} URLs`));
-    }
-    if (low > 0) {
-      console.log(chalk.blue(`   ℹ️  Low severity:    ${low} URLs`));
-    }
+    const severityParts = [];
+    if (high > 0) severityParts.push(chalk.red(`High: ${high}`));
+    if (medium > 0) severityParts.push(chalk.yellow(`Medium: ${medium}`));
+    if (low > 0) severityParts.push(chalk.blue(`Low: ${low}`));
+    
+    const severitySummary = severityParts.length > 0 ? ` (${severityParts.join(', ')})` : '';
+    console.log(chalk.yellow(`⚠️  ${riskyUrlCount} risky URLs found${severitySummary}`));
   }
   console.log('');
 }
@@ -219,11 +208,13 @@ async function runAnalysisPipeline(
   
   // Phase 1: Discovery
   let phaseStart = Date.now();
-  if (!config.silent) {
-    console.log(chalk.cyan('\n[Phase 1/5] Discovering Sitemaps'));
-  }
+  const discoverySpinner = showProgress ? ora({ text: 'Discovering sitemaps...', color: 'cyan' }).start() : null;
   
   const discoveryResult = await discoverSitemaps(url, config);
+  
+  if (discoverySpinner) {
+    discoverySpinner.stop();
+  }
   
   phaseTimings.push({
     name: 'Discovery',
@@ -231,10 +222,6 @@ async function runAnalysisPipeline(
     endTime: Date.now(),
     duration: Date.now() - phaseStart
   });
-  
-  if (!config.silent) {
-    console.log(chalk.green(`✓ Found ${discoveryResult.sitemaps.length} sitemap(s) (${((Date.now() - phaseStart) / 1000).toFixed(1)}s)`));
-  }
   
   // Check for access issues
   if (discoveryResult.accessIssues.length > 0) {
@@ -252,10 +239,6 @@ async function runAnalysisPipeline(
   
   // Phase 2: Parsing & Extraction
   phaseStart = Date.now();
-  if (!config.silent) {
-    console.log(chalk.cyan('\n[Phase 2/5] Parsing Sitemaps'));
-  }
-  
   let extractionResult;
   if (showProgress && discoveryResult.sitemaps.length > 10) {
     const parseBar = new cliProgress.SingleBar({
@@ -289,9 +272,7 @@ async function runAnalysisPipeline(
     duration: Date.now() - phaseStart
   });
   
-  if (!config.silent) {
-    console.log(chalk.green(`✓ Extracted ${extractionResult.allUrls.length.toLocaleString()} URLs (${((Date.now() - phaseStart) / 1000).toFixed(1)}s)`));
-  }
+  // Don't print yet, will combine after deduplication
   
   // Collect errors
   if (extractionResult.errors.length > 0) {
@@ -310,10 +291,6 @@ async function runAnalysisPipeline(
   
   // Phase 3: Consolidation & Deduplication
   phaseStart = Date.now();
-  if (!config.silent) {
-    console.log(chalk.cyan('\n[Phase 3/5] Deduplication'));
-  }
-  
   const consolidatedResult = consolidateUrls(extractionResult.allUrls);
   
   phaseTimings.push({
@@ -324,20 +301,21 @@ async function runAnalysisPipeline(
   });
   
   const duplicatesRemoved = extractionResult.allUrls.length - consolidatedResult.uniqueUrls.length;
+  const duplicatePercentage = (duplicatesRemoved / extractionResult.allUrls.length) * 100;
+  
   if (!config.silent) {
-    if (duplicatesRemoved > 0) {
-      console.log(chalk.green(`✓ ${consolidatedResult.uniqueUrls.length.toLocaleString()} unique URLs (removed ${duplicatesRemoved.toLocaleString()} duplicates) (${((Date.now() - phaseStart) / 1000).toFixed(1)}s)`));
+    // Show combined summary
+    if (duplicatesRemoved > 100 || duplicatePercentage > 1) {
+      // Significant duplicates - show them
+      console.log(chalk.green(`✓ Analyzed ${discoveryResult.sitemaps.length} sitemap(s) → ${extractionResult.allUrls.length.toLocaleString()} URLs (${consolidatedResult.uniqueUrls.length.toLocaleString()} unique)`));
     } else {
-      console.log(chalk.green(`✓ ${consolidatedResult.uniqueUrls.length.toLocaleString()} unique URLs (${((Date.now() - phaseStart) / 1000).toFixed(1)}s)`));
+      // Few/no duplicates - keep it simple
+      console.log(chalk.green(`✓ Analyzed ${discoveryResult.sitemaps.length} sitemap(s) → ${extractionResult.allUrls.length.toLocaleString()} URLs`));
     }
   }
   
   // Phase 4: Risk Detection
   phaseStart = Date.now();
-  if (!config.silent) {
-    console.log(chalk.cyan('\n[Phase 4/5] Risk Detection'));
-  }
-  
   const riskResult = await detectRisks(consolidatedResult.uniqueUrls, url, config);
   const riskGroups = groupRiskFindings(riskResult.findings);
   
@@ -348,21 +326,8 @@ async function runAnalysisPipeline(
     duration: Date.now() - phaseStart
   });
   
-  const totalRiskyUrls = riskGroups.groups.reduce((sum, g) => sum + g.count, 0);
-  if (!config.silent) {
-    if (totalRiskyUrls > 0) {
-      console.log(chalk.yellow(`⚠ Found ${totalRiskyUrls} risky URL(s) (${((Date.now() - phaseStart) / 1000).toFixed(1)}s)`));
-    } else {
-      console.log(chalk.green(`✓ No risks detected (${((Date.now() - phaseStart) / 1000).toFixed(1)}s)`));
-    }
-  }
-  
   // Phase 5: Generate Summary
   phaseStart = Date.now();
-  if (!config.silent) {
-    console.log(chalk.cyan('\n[Phase 5/5] Generating Report'));
-  }
-  
   const executionTime = Date.now() - overallStartTime;
   const summary = summarizeRisks({
     riskGroups: riskGroups.groups,
@@ -378,13 +343,15 @@ async function runAnalysisPipeline(
     duration: Date.now() - phaseStart
   });
   
-  if (!config.silent) {
-    console.log(chalk.green(`✓ Report generated (${((Date.now() - phaseStart) / 1000).toFixed(1)}s)`));
-  }
-  
-  // Display phase summary
-  if (!config.silent) {
+  // Display phase summary only in verbose mode
+  if (!config.silent && config.verbose) {
     displayPhaseSummary(phaseTimings, executionTime);
+  } else if (!config.silent) {
+    // Calculate throughput
+    const parsingPhase = phaseTimings.find(p => p.name === 'Parsing');
+    const sitemapsPerSec = parsingPhase ? (discoveryResult.sitemaps.length / (parsingPhase.duration / 1000)).toFixed(1) : '0';
+    
+    console.log(chalk.green(`✅ Analysis complete (${(executionTime / 1000).toFixed(1)}s · ${sitemapsPerSec} sitemaps/sec)\n`));
   }
   
   // Save benchmark if requested
@@ -506,6 +473,7 @@ async function saveBenchmark(
       memory_total_mb: Math.round(os.totalmem() / 1024 / 1024)
     },
     config: {
+      discovery_concurrency: config.discoveryConcurrency,
       parsing_concurrency: config.parsingConcurrency,
       risk_detection_concurrency: config.riskDetectionConcurrency,
       risk_detection_batch_size: config.riskDetectionBatchSize

@@ -3,6 +3,7 @@ export interface Config {
   timeout: number;              // HTTP timeout in seconds
   concurrency: number;          // Concurrent sitemap fetches
   parsingConcurrency?: number;  // Concurrent sitemap parsing (default: 50)
+  discoveryConcurrency?: number; // Concurrent sitemap index discovery (default: 50)
   
   // Output settings
   outputFormat: 'json' | 'html';
@@ -27,6 +28,7 @@ export const DEFAULT_CONFIG: Config = {
   timeout: 30,
   concurrency: 10,
   parsingConcurrency: 50,  // Optimized for network-bound parallel parsing
+  discoveryConcurrency: 50,  // Optimized for recursive sitemap index discovery
   outputFormat: 'html',
   outputDir: './sitemap-qa/report',
   verbose: false,

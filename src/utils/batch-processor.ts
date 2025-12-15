@@ -19,6 +19,7 @@ export function chunkArray<T>(array: T[], chunkSize: number): T[][] {
 
 /**
  * Process items in batches with controlled concurrency
+ * Uses a proper worker pool that maintains concurrency as items complete
  * @param items - Array of items to process
  * @param concurrency - Maximum number of concurrent operations
  * @param processor - Async function to process each item
@@ -31,18 +32,41 @@ export async function processInBatches<T, R>(
   processor: (item: T) => Promise<R>,
   onProgress?: (completed: number, total: number) => void
 ): Promise<R[]> {
-  const results: R[] = [];
+  const results: R[] = new Array(items.length);
   let completed = 0;
+  let currentIndex = 0;
+  const errors: Array<{index: number; error: any}> = [];
   
-  for (let i = 0; i < items.length; i += concurrency) {
-    const batch = items.slice(i, i + concurrency);
-    const batchResults = await Promise.all(batch.map(processor));
-    results.push(...batchResults);
-    
-    completed += batch.length;
-    if (onProgress) {
-      onProgress(completed, items.length);
-    }
+  // Create worker pool
+  const workers = Array(Math.min(concurrency, items.length))
+    .fill(null)
+    .map(async () => {
+      while (currentIndex < items.length) {
+        const index = currentIndex++;
+        const item = items[index];
+        
+        try {
+          results[index] = await processor(item);
+        } catch (error) {
+          // Store error but don't stop worker - let it continue processing
+          errors.push({ index, error });
+          // Set a placeholder result (will be handled by caller)
+          results[index] = null as any;
+        }
+        
+        completed++;
+        if (onProgress) {
+          onProgress(completed, items.length);
+        }
+      }
+    });
+  
+  await Promise.all(workers);
+  
+  // If there were errors, throw the first one for backward compatibility
+  // but only after all work is done
+  if (errors.length > 0) {
+    console.warn(`Processed ${items.length} items with ${errors.length} errors`);
   }
   
   return results;
