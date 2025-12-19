@@ -375,13 +375,13 @@ export async function discoverSitemaps(
   const robotsSitemaps = await parseRobotsTxt(normalizedUrl, config);
   if (robotsSitemaps.length > 0) {
     const sitemaps = await discoverAllSitemaps(robotsSitemaps, config);
-    if (sitemaps.length > 0) {
-      return {
-        sitemaps,
-        source: 'robots-txt',
-        accessIssues: []
-      };
-    }
+    // Even if all sitemaps from robots.txt are inaccessible (resulting in an empty array),
+    // treat robots.txt as the authoritative source and do not fall back to standard paths.
+    return {
+      sitemaps,
+      source: 'robots-txt',
+      accessIssues: []
+    };
   }
   
   // Strategy 2: Try standard paths as fallback
