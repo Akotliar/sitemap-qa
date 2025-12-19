@@ -1,10 +1,6 @@
 import { RiskPattern } from '@/core/risk-detector';
 
 export const RISK_PATTERNS: RiskPattern[] = [
-  // Note: Environment leakage patterns moved to domain-patterns.ts
-  // Note: Admin path patterns moved to admin-patterns.ts
-  // to avoid duplication and improve maintainability
-  
   // Sensitive Parameter Patterns (HIGH)
   {
     name: 'Authentication Parameter',
