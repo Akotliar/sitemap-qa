@@ -14,6 +14,14 @@ export interface DiscoveryResult {
   accessIssues: SitemapAccessIssue[];
 }
 
+/**
+ * Attempts to find sitemaps at standard paths (/sitemap.xml, /sitemap_index.xml, /sitemap-index.xml).
+ * Tries all paths concurrently for fast discovery.
+ * 
+ * @param baseUrl - The base URL of the website (origin only)
+ * @param config - Configuration object containing timeout and verbose settings
+ * @returns Object containing found sitemaps and any access issues (401/403 errors)
+ */
 async function tryStandardPaths(
   baseUrl: string,
   config: Config
@@ -83,6 +91,14 @@ async function tryStandardPaths(
   return { sitemaps: [], issues: accessIssues };
 }
 
+/**
+ * Parses robots.txt file to extract sitemap URLs from 'Sitemap:' directives.
+ * Validates that extracted URLs are valid before returning them.
+ * 
+ * @param baseUrl - The base URL of the website (origin only)
+ * @param config - Configuration object containing timeout and verbose settings
+ * @returns Array of sitemap URLs found in robots.txt, or empty array if none found
+ */
 async function parseRobotsTxt(
   baseUrl: string,
   config: Config
@@ -128,6 +144,16 @@ async function parseRobotsTxt(
   }
 }
 
+/**
+ * Determines if XML content is a sitemap index (contains references to other sitemaps).
+ * Handles both standard <sitemapindex> format and malformed <urlset> format.
+ * 
+ * For malformed indices (using <urlset> instead of <sitemapindex>), uses a heuristic:
+ * checks if the majority of the first 5 URLs end in .xml or contain 'sitemap'.
+ * 
+ * @param xmlContent - Raw XML content of the sitemap
+ * @returns true if content is a sitemap index, false if it's a regular sitemap
+ */
 function isSitemapIndex(xmlContent: string): boolean {
   // Check for proper sitemapindex format
   if (xmlContent.includes('<sitemapindex')) {
@@ -161,9 +187,15 @@ function isSitemapIndex(xmlContent: string): boolean {
 
 /**
  * Extracts sitemap URLs from a sitemap index file.
- * Handles both:
- * 1. Proper format: <sitemapindex><sitemap><loc>...</loc></sitemap></sitemapindex>
- * 2. Malformed format: <urlset><url><loc>sitemap.xml</loc></url></urlset>
+ * Handles both standard and malformed formats:
+ * 1. Standard: <sitemapindex><sitemap><loc>...</loc></sitemap></sitemapindex>
+ * 2. Malformed: <urlset><url><loc>sitemap.xml</loc></url></urlset>
+ * 
+ * For malformed indices, only extracts URLs that look like sitemaps (contain 'sitemap' or end in .xml).
+ * Validates all URLs before returning them.
+ * 
+ * @param xmlContent - Raw XML content of the sitemap index
+ * @returns Array of valid sitemap URLs extracted from the index
  */
 function extractSitemapIndexUrls(xmlContent: string): string[] {
   const urls: string[] = [];
@@ -212,6 +244,20 @@ function extractSitemapIndexUrls(xmlContent: string): string[] {
   return urls;
 }
 
+/**
+ * Recursively discovers all sitemaps by following sitemap index references.
+ * Processes sitemaps in batches for performance, avoiding duplicate processing.
+ * 
+ * Algorithm:
+ * 1. Fetch each sitemap URL
+ * 2. If it's a sitemap index, extract child URLs and add to processing queue
+ * 3. If it's a regular sitemap, add to final results
+ * 4. Repeat until all sitemaps are processed or limit reached (1000 max)
+ * 
+ * @param initialSitemaps - Array of sitemap URLs to start discovery from
+ * @param config - Configuration object containing timeout, retry, and concurrency settings
+ * @returns Array of all discovered regular sitemap URLs (excludes indices)
+ */
 async function discoverAllSitemaps(
   initialSitemaps: string[],
   config: Config
@@ -299,6 +345,22 @@ async function discoverAllSitemaps(
   return finalSitemaps;
 }
 
+/**
+ * Main sitemap discovery function. Uses multiple strategies to find sitemaps for a website.
+ * 
+ * Strategy 1: Check robots.txt for 'Sitemap:' directives (preferred method)
+ * Strategy 2: Try standard paths (/sitemap.xml, /sitemap_index.xml, /sitemap-index.xml)
+ * 
+ * For each strategy, recursively follows sitemap indices to discover all sitemaps.
+ * Returns immediately when sitemaps are found via any strategy.
+ * 
+ * Note: Axios automatically follows redirects (e.g., www vs non-www, HTTP to HTTPS),
+ * so domain variants are handled transparently.
+ * 
+ * @param baseUrl - The base URL of the website to analyze (e.g., 'https://example.com')
+ * @param config - Configuration object containing timeout, retry, verbosity, and concurrency settings
+ * @returns DiscoveryResult containing found sitemaps, discovery source, and any access issues
+ */
 export async function discoverSitemaps(
   baseUrl: string,
   config: Config
