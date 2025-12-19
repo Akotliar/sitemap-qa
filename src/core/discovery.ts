@@ -399,6 +399,13 @@ export async function discoverSitemaps(
         accessIssues: []
       };
     }
+
+    // Standard sitemap paths were found but all sitemaps were inaccessible
+    return {
+      sitemaps: [],
+      source: 'standard-path',
+      accessIssues: issues
+    };
   }
   
   // No sitemaps found
