@@ -1,6 +1,6 @@
 import { Config } from '@/types/config';
 import { fetchUrl } from '@/utils/http-client';
-import { HttpError, NetworkError } from '@/errors/network-errors';
+import { HttpError } from '@/errors/network-errors';
 
 export interface SitemapAccessIssue {
   url: string;
@@ -11,60 +11,21 @@ export interface SitemapAccessIssue {
 export interface DiscoveryResult {
   sitemaps: string[];
   source: 'standard-path' | 'robots-txt' | 'none';
-  accessIssues: SitemapAccessIssue[];  // Track sitemaps that exist but are inaccessible
-  canonicalDomain?: string;  
-}
-
-function normalizeBaseUrl(url: string): string {
-  const parsed = new URL(url);
-  return parsed.origin;
+  accessIssues: SitemapAccessIssue[];
 }
 
 /**
- * Detect the canonical domain by checking which version (www vs non-www) is final.
- * Makes a HEAD request and follows redirects to determine the canonical version.
+ * Attempts to find sitemaps at standard paths (/sitemap.xml, /sitemap_index.xml, /sitemap-index.xml).
+ * Tries all paths concurrently for fast discovery.
+ * 
+ * @param baseUrl - The base URL of the website (origin only)
+ * @param config - Configuration object containing timeout and verbose settings
+ * @returns Object containing found sitemaps and any access issues (401/403 errors)
  */
-async function detectCanonicalDomain(baseUrl: string, config: Config): Promise<string> {
-  const urlObj = new URL(baseUrl);
-  const hasWww = urlObj.hostname.startsWith('www.');
-  
-  // Try the opposite version to see which one works
-  const alternateHostname = hasWww 
-    ? urlObj.hostname.substring(4)  // Remove 'www.'
-    : `www.${urlObj.hostname}`;      // Add 'www.'
-  
-  const alternateUrl = `${urlObj.protocol}//${alternateHostname}/robots.txt`;
-  
-  try {
-    // Try to fetch robots.txt from the alternate version
-    const result = await fetchUrl(alternateUrl, {
-      timeout: config.timeout,
-      maxRetries: 1
-    });
-    
-    // If alternate version succeeds (200 or 404), it's accessible - use it as canonical
-    if (result.statusCode === 200 || result.statusCode === 404) {
-      return alternateHostname;
-    }
-    
-    // Otherwise, current version is probably canonical
-    return urlObj.hostname;
-    
-  } catch (error) {
-    if (error instanceof HttpError && error.statusCode === 301) {
-      // Alternate redirects back, current version is canonical
-      return urlObj.hostname;
-    }
-    
-    // If alternate fails, current version is canonical
-    return urlObj.hostname;
-  }
-}
-
 async function tryStandardPaths(
   baseUrl: string,
   config: Config
-): Promise<{ sitemaps: string[]; issues: SitemapAccessIssue[]; redirectedToCanonical?: string }> {
+): Promise<{ sitemaps: string[]; issues: SitemapAccessIssue[] }> {
   const baseDomain = new URL(baseUrl).origin;
   const accessIssues: SitemapAccessIssue[] = [];
   
@@ -130,6 +91,14 @@ async function tryStandardPaths(
   return { sitemaps: [], issues: accessIssues };
 }
 
+/**
+ * Parses robots.txt file to extract sitemap URLs from 'Sitemap:' directives.
+ * Validates that extracted URLs are valid before returning them.
+ * 
+ * @param baseUrl - The base URL of the website (origin only)
+ * @param config - Configuration object containing timeout and verbose settings
+ * @returns Array of sitemap URLs found in robots.txt, or empty array if none found
+ */
 async function parseRobotsTxt(
   baseUrl: string,
   config: Config
@@ -175,6 +144,16 @@ async function parseRobotsTxt(
   }
 }
 
+/**
+ * Determines if XML content is a sitemap index (contains references to other sitemaps).
+ * Handles both standard <sitemapindex> format and malformed <urlset> format.
+ * 
+ * For malformed indices (using <urlset> instead of <sitemapindex>), uses a heuristic:
+ * checks if the majority of the first 5 URLs end in .xml or contain 'sitemap'.
+ * 
+ * @param xmlContent - Raw XML content of the sitemap
+ * @returns true if content is a sitemap index, false if it's a regular sitemap
+ */
 function isSitemapIndex(xmlContent: string): boolean {
   // Check for proper sitemapindex format
   if (xmlContent.includes('<sitemapindex')) {
@@ -208,9 +187,15 @@ function isSitemapIndex(xmlContent: string): boolean {
 
 /**
  * Extracts sitemap URLs from a sitemap index file.
- * Handles both:
- * 1. Proper format: <sitemapindex><sitemap><loc>...</loc></sitemap></sitemapindex>
- * 2. Malformed format: <urlset><url><loc>sitemap.xml</loc></url></urlset>
+ * Handles both standard and malformed formats:
+ * 1. Standard: <sitemapindex><sitemap><loc>...</loc></sitemap></sitemapindex>
+ * 2. Malformed: <urlset><url><loc>sitemap.xml</loc></url></urlset>
+ * 
+ * For malformed indices, only extracts URLs that look like sitemaps (contain 'sitemap' or end in .xml).
+ * Validates all URLs before returning them.
+ * 
+ * @param xmlContent - Raw XML content of the sitemap index
+ * @returns Array of valid sitemap URLs extracted from the index
  */
 function extractSitemapIndexUrls(xmlContent: string): string[] {
   const urls: string[] = [];
@@ -259,20 +244,29 @@ function extractSitemapIndexUrls(xmlContent: string): string[] {
   return urls;
 }
 
+/**
+ * Recursively discovers all sitemaps by following sitemap index references.
+ * Processes sitemaps in batches for performance, avoiding duplicate processing.
+ * 
+ * Algorithm:
+ * 1. Fetch each sitemap URL
+ * 2. If it's a sitemap index, extract child URLs and add to processing queue
+ * 3. If it's a regular sitemap, add to final results
+ * 4. Repeat until all sitemaps are processed or limit reached (1000 max)
+ * 
+ * @param initialSitemaps - Array of sitemap URLs to start discovery from
+ * @param config - Configuration object containing timeout, retry, and concurrency settings
+ * @returns Array of all discovered regular sitemap URLs (excludes indices)
+ */
 async function discoverAllSitemaps(
   initialSitemaps: string[],
-  config: Config,
-  baseUrl: string,
-  canonicalDomain?: string,  // Optional - will be detected on first 301 if needed
-  _maxDepth: number = 10
-): Promise<{ sitemaps: string[]; canonicalDomain?: string }> {
+  config: Config
+): Promise<string[]> {
   const finalSitemaps: string[] = [];
   const toProcess = [...initialSitemaps];
   const processed = new Set<string>();
-  const failed = new Set<string>();
-  const redirected = new Set<string>();
-  let detectedCanonical = canonicalDomain;
-  const BATCH_SIZE = config.discoveryConcurrency || 50; // Configurable concurrent processing
+  const inaccessible = new Set<string>();
+  const BATCH_SIZE = config.discoveryConcurrency || 50;
   
   while (toProcess.length > 0) {
     // Take a batch of URLs to process concurrently
@@ -316,47 +310,14 @@ async function discoverAllSitemaps(
         }
         
       } catch (error) {
-        // Track failures
-        if (error instanceof HttpError && error.statusCode === 301) {
-          redirected.add(sitemapUrl);
-          
-          if (config.verbose) {
-            if (!detectedCanonical) {
-              detectedCanonical = await detectCanonicalDomain(baseUrl, config);
-              if (config.verbose) {
-                console.log(`Canonical domain detected: ${detectedCanonical}`);
-              }
-            }
-            
-            try {
-              const sitemapUrlObj = new URL(sitemapUrl);
-              
-              if (sitemapUrlObj.hostname !== detectedCanonical) {
-                console.warn(`⚠️  Sitemap URL redirects (301): ${sitemapUrl}`);
-                console.warn(`   Problem: The sitemap index contains a URL that redirects.`);
-                console.warn(`   Likely issue: Domain mismatch - expected "${detectedCanonical}" but got "${sitemapUrlObj.hostname}"`);
-                console.warn(`   Fix: Update sitemap index to use "https://${detectedCanonical}${sitemapUrlObj.pathname}"`);
-              } else {
-                console.warn(`⚠️  Sitemap URL redirects (301): ${sitemapUrl}`);
-                console.warn(`   Fix: Update the sitemap index to reference the final URL after redirect.`);
-              }
-            } catch {
-              const message = error instanceof Error ? error.message : String(error);
-              console.warn(`Failed to fetch sitemap ${sitemapUrl}: ${message}`);
-            }
-          }
-          
-          return { type: 'redirect' as const };
-        } else {
-          failed.add(sitemapUrl);
-          
-          if (config.verbose) {
-            const message = error instanceof Error ? error.message : String(error);
-            console.warn(`Failed to fetch sitemap ${sitemapUrl}: ${message}`);
-          }
-          
-          return { type: 'failed' as const };
+        inaccessible.add(sitemapUrl);
+        
+        if (config.verbose) {
+          const message = error instanceof Error ? error.message : String(error);
+          console.warn(`Failed to fetch sitemap ${sitemapUrl}: ${message}`);
         }
+        
+        return { type: 'failed' as const };
       }
     }));
     
@@ -376,136 +337,81 @@ async function discoverAllSitemaps(
     }
   }
   
-  // Provide helpful feedback about sitemap discovery results
-  const totalProcessed = processed.size;
-  const totalFailed = failed.size;
-  const totalRedirected = redirected.size;
-  const sitemapIndexCount = totalProcessed - finalSitemaps.length - totalFailed - totalRedirected;
-  
-  if (finalSitemaps.length === 0 && totalProcessed > 0) {
-    console.warn(`\n⚠️  SITEMAP DISCOVERY ISSUE`);
-    
-    if (sitemapIndexCount > 0 && (totalFailed > 0 || totalRedirected > 0)) {
-      console.warn(`Found ${sitemapIndexCount} sitemap index(es) containing ${totalFailed + totalRedirected} child sitemap(s):`);
-      if (totalRedirected > 0) {
-        console.warn(`  - ${totalRedirected} sitemap(s) return 301 redirects (content not accessible without following redirect)`);
-      }
-      if (totalFailed > 0) {
-        console.warn(`  - ${totalFailed} sitemap(s) returned errors (404, 403, 500, or network issues)`);
-      }
-    } else if (totalRedirected > 0) {
-      console.warn(`All ${totalRedirected} sitemap(s) return 301 redirects.`);
-    } else if (totalFailed > 0) {
-      console.warn(`All ${totalFailed} sitemap(s) returned errors.`);
-      console.warn(`\nCommon causes:`);
-      console.warn(`  - 403 Forbidden: Bot protection (Cloudflare, etc.) or IP blocking`);
-      console.warn(`  - 404 Not Found: Sitemaps don't exist at these URLs`);
-      console.warn(`  - 500/502/503: Server errors or maintenance`);
-      console.warn(`\nIf sitemaps work in your browser but not here, the site likely has bot protection.`);
-      console.warn(`Try: Check if sitemaps load without JavaScript, or contact site administrator.`);
-    } else {
-      console.warn(`Processed ${totalProcessed} URL(s) but found no accessible sitemaps.`);
-    }
-    
-    console.warn(`\nNote: This tool does not follow redirects for sitemap URLs.`);
-    if (totalRedirected > 0) {
-      console.warn(`\nPossible causes of redirects:`);
-      console.warn(`  - Sitemap index uses non-canonical domain (e.g., missing 'www' or vice versa)`);
-      console.warn(`  - Sitemap URLs redirect from HTTP to HTTPS`);
-      console.warn(`  - Intentional redirects in your site configuration`);
-      console.warn(`\nRecommendation: Update sitemap index URLs to match the final destination (no redirects).`);
-    }
-    console.warn(``);
+  if (finalSitemaps.length === 0 && inaccessible.size > 0) {
+    console.warn(`\n⚠️  All ${inaccessible.size} sitemap(s) were inaccessible`);
+    console.warn(`Common causes: 403/404 errors, network issues, or bot protection`);
   }
   
-  return { sitemaps: finalSitemaps, canonicalDomain: detectedCanonical };
+  return finalSitemaps;
 }
 
+/**
+ * Main sitemap discovery function. Uses multiple strategies to find sitemaps for a website.
+ * 
+ * Strategy 1: Check robots.txt for 'Sitemap:' directives (preferred method)
+ * Strategy 2: Try standard paths (/sitemap.xml, /sitemap_index.xml, /sitemap-index.xml)
+ * 
+ * For each strategy, recursively follows sitemap indices to discover all sitemaps.
+ * Returns immediately when sitemaps are found via any strategy.
+ * 
+ * Note: Axios automatically follows redirects (e.g., www vs non-www, HTTP to HTTPS),
+ * so domain variants are handled transparently.
+ * 
+ * @param baseUrl - The base URL of the website to analyze (e.g., 'https://example.com')
+ * @param config - Configuration object containing timeout, retry, verbosity, and concurrency settings
+ * @returns DiscoveryResult containing found sitemaps, discovery source, and any access issues
+ */
 export async function discoverSitemaps(
   baseUrl: string,
   config: Config
 ): Promise<DiscoveryResult> {
-  const normalizedUrl = normalizeBaseUrl(baseUrl);
-  let allAccessIssues: SitemapAccessIssue[] = [];
-  
-  // Canonical domain will be detected lazily if we encounter redirects
-  let canonicalDomain: string | undefined;
+  const normalizedUrl = new URL(baseUrl).origin;
   
   // Strategy 1: Try robots.txt first
   if (config.verbose) {
-    console.log('Strategy 1: Checking robots.txt for sitemap directives...');
+    console.log('Checking robots.txt for sitemap directives...');
   }
   
   const robotsSitemaps = await parseRobotsTxt(normalizedUrl, config);
   if (robotsSitemaps.length > 0) {
-    const { sitemaps: allSitemaps, canonicalDomain: detected } = await discoverAllSitemaps(robotsSitemaps, config, normalizedUrl, canonicalDomain);
-    canonicalDomain = detected;  // Update if it was detected during traversal
-    
-    // If we successfully found sitemaps via robots.txt, don't report
-    // standard path access issues as critical (they're just alternatives)
+    const sitemaps = await discoverAllSitemaps(robotsSitemaps, config);
+    // Even if all sitemaps from robots.txt are inaccessible (resulting in an empty array),
+    // treat robots.txt as the authoritative source and do not fall back to standard paths.
     return {
-      sitemaps: allSitemaps,
+      sitemaps,
       source: 'robots-txt',
-      accessIssues: [],  // Clear access issues since we found working sitemaps
-      canonicalDomain
+      accessIssues: []
     };
   }
   
   // Strategy 2: Try standard paths as fallback
   if (config.verbose) {
-    console.log('Strategy 2: Trying standard sitemap paths...');
+    console.log('Trying standard sitemap paths...');
   }
   
-  const { sitemaps: standardSitemaps, issues, redirectedToCanonical } = await tryStandardPaths(normalizedUrl, config);
-  allAccessIssues = issues;
-  
+  const { sitemaps: standardSitemaps, issues } = await tryStandardPaths(normalizedUrl, config);
   if (standardSitemaps.length > 0) {
-    const { sitemaps: allSitemaps, canonicalDomain: detected } = await discoverAllSitemaps(standardSitemaps, config, normalizedUrl, canonicalDomain);
-    canonicalDomain = detected;  // Update if it was detected during traversal
+    const sitemaps = await discoverAllSitemaps(standardSitemaps, config);
+    if (sitemaps.length > 0) {
+      return {
+        sitemaps,
+        source: 'standard-path',
+        accessIssues: []
+      };
+    }
+
+    // Standard sitemap paths were found but all sitemaps were inaccessible
     return {
-      sitemaps: allSitemaps,
+      sitemaps: [],
       source: 'standard-path',
-      accessIssues: [],  // Clear access issues since we found working sitemaps
-      canonicalDomain
+      accessIssues: issues
     };
   }
   
-  // Strategy 3: If all requests redirected, try the canonical domain
-  if (redirectedToCanonical) {
-    const canonicalUrl = `https://${redirectedToCanonical}`;
-    console.log(`\n💡 All requests redirected. Retrying with canonical domain: ${redirectedToCanonical}\n`);
-    
-    // Try robots.txt on canonical domain
-    const canonicalRobotsSitemaps = await parseRobotsTxt(canonicalUrl, config);
-    if (canonicalRobotsSitemaps.length > 0) {
-      const { sitemaps: allSitemaps, canonicalDomain: detected } = await discoverAllSitemaps(canonicalRobotsSitemaps, config, canonicalUrl, redirectedToCanonical);
-      return {
-        sitemaps: allSitemaps,
-        source: 'robots-txt',
-        accessIssues: [],
-        canonicalDomain: detected || redirectedToCanonical
-      };
-    }
-    
-    // Try standard paths on canonical domain
-    const { sitemaps: canonicalStandardSitemaps } = await tryStandardPaths(canonicalUrl, config);
-    if (canonicalStandardSitemaps.length > 0) {
-      const { sitemaps: allSitemaps, canonicalDomain: detected } = await discoverAllSitemaps(canonicalStandardSitemaps, config, canonicalUrl, redirectedToCanonical);
-      return {
-        sitemaps: allSitemaps,
-        source: 'standard-path',
-        accessIssues: [],
-        canonicalDomain: detected || redirectedToCanonical
-      };
-    }
-  }
-  
-  // Strategy 4: No sitemaps found - NOW report access issues as critical
-  // because they prevented us from finding any accessible sitemap
+  // No sitemaps found
   return {
     sitemaps: [],
     source: 'none',
-    accessIssues: allAccessIssues,
-    canonicalDomain
+    accessIssues: issues
   };
 }

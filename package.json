@@ -1,6 +1,6 @@
 {
   "name": "@akotliar/sitemap-qa",
-  "version": "1.0.0-alpha.0",
+  "version": "1.0.0-alpha.1",
   "description": "Detect test/qa/dev/staging URLs, admin paths, sensitive parameters, and URLs that shouldn't be publicly indexed.",
   "type": "module",
   "main": "./dist/index.js",
@@ -52,8 +52,7 @@
     "dotenv": "^17.2.3",
     "fast-xml-parser": "^5.3.2",
     "ora": "^8.2.0",
-    "playwright": "^1.57.0",
-    "undici": "^7.16.0"
+    "playwright": "^1.57.0"
   },
   "devDependencies": {
     "@types/cli-progress": "^3.11.6",

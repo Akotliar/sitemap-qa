@@ -26,8 +26,8 @@ describe.skip('Story 7.2: Risk Detection Performance', () => {
     const result = await detectRisks(urls, 'https://example.com', config);
     const elapsed = Date.now() - start;
     
-    console.log(`\n  ✓ 1M URLs analyzed in ${(elapsed / 1000).toFixed(2)}s`);
-    console.log(`  ✓ Speed: ${Math.round(1_000_000 / (elapsed / 1000)).toLocaleString()} URLs/sec`);
+    console.log(`\n1M URLs analyzed in ${(elapsed / 1000).toFixed(2)}s`);
+    console.log(`  Speed: ${Math.round(1_000_000 / (elapsed / 1000)).toLocaleString()} URLs/sec`);
     
     expect(elapsed).toBeLessThan(30000); // 30 seconds
     expect(result.totalUrlsAnalyzed).toBe(1_000_000);
@@ -49,7 +49,7 @@ describe.skip('Story 7.2: Risk Detection Performance', () => {
     await detectRisks(urls, 'https://example.com', config);
     const elapsed = Date.now() - start;
     
-    console.log(`  ✓ 100k URLs analyzed in ${(elapsed / 1000).toFixed(2)}s`);
+    console.log(`100k URLs analyzed in ${(elapsed / 1000).toFixed(2)}s`);
     
     expect(actualConcurrency).toBeGreaterThanOrEqual(2);
     expect(actualConcurrency).toBeLessThanOrEqual(cpuCount);
