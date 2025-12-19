@@ -178,7 +178,7 @@ function showCliSummary(result: AnalysisPipelineResult): void {
   console.log(chalk.dim('─'.repeat(50)));
   
   if (riskyUrlCount === 0) {
-    console.log(chalk.green('✅ No issues found - sitemap looks clean!'));
+    console.log(chalk.green('No issues found - sitemap looks clean!'));
   } else {
     // Build inline severity summary
     const { high, medium, low } = result.summary.severityBreakdown;
@@ -307,10 +307,10 @@ async function runAnalysisPipeline(
     // Show combined summary
     if (duplicatesRemoved > 100 || duplicatePercentage > 1) {
       // Significant duplicates - show them
-      console.log(chalk.green(`✓ Analyzed ${discoveryResult.sitemaps.length} sitemap(s) → ${extractionResult.allUrls.length.toLocaleString()} URLs (${consolidatedResult.uniqueUrls.length.toLocaleString()} unique)`));
+      console.log(chalk.green(`Found ${discoveryResult.sitemaps.length} sitemap(s) → ${extractionResult.allUrls.length.toLocaleString()} URLs (${consolidatedResult.uniqueUrls.length.toLocaleString()} unique)`));
     } else {
       // Few/no duplicates - keep it simple
-      console.log(chalk.green(`✓ Analyzed ${discoveryResult.sitemaps.length} sitemap(s) → ${extractionResult.allUrls.length.toLocaleString()} URLs`));
+      console.log(chalk.green(`Found ${discoveryResult.sitemaps.length} sitemap(s) → ${extractionResult.allUrls.length.toLocaleString()} URLs`));
     }
   }
   
@@ -351,7 +351,7 @@ async function runAnalysisPipeline(
     const parsingPhase = phaseTimings.find(p => p.name === 'Parsing');
     const sitemapsPerSec = parsingPhase ? (discoveryResult.sitemaps.length / (parsingPhase.duration / 1000)).toFixed(1) : '0';
     
-    console.log(chalk.green(`✅ Analysis complete (${(executionTime / 1000).toFixed(1)}s · ${sitemapsPerSec} sitemaps/sec)\n`));
+    console.log(chalk.green(`Analysis complete (${(executionTime / 1000).toFixed(1)}s · ${sitemapsPerSec} sitemaps/sec)\n`));
   }
   
   // Save benchmark if requested
@@ -423,7 +423,7 @@ function handleAnalysisError(error: unknown, config?: Config): void {
  * Display phase timing summary
  */
 function displayPhaseSummary(timings: PhaseTiming[], totalTime: number): void {
-  console.log(chalk.green(`\n✅ Analysis Complete (Total: ${(totalTime / 1000).toFixed(1)}s)\n`));
+  console.log(chalk.green(`\nAnalysis Complete (Total: ${(totalTime / 1000).toFixed(1)}s)\n`));
   console.log(chalk.cyan('Phase Breakdown:'));
   
   for (const timing of timings) {
