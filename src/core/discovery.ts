@@ -15,7 +15,10 @@ export interface DiscoveryResult {
 }
 
 /**
- * Attempts to find sitemaps at standard paths (/sitemap.xml, /sitemap_index.xml, /sitemap-index.xml).
+ * Attempts to find sitemaps at standard paths, including both uncompressed and gzipped variants.
+ * Checks: /sitemap.xml, /sitemap.xml.gz, /sitemap_index.xml, /sitemap_index.xml.gz, 
+ * /sitemap-index.xml, /sitemap-index.xml.gz
+ * 
  * Tries all paths concurrently for fast discovery.
  * 
  * @param baseUrl - The base URL of the website (origin only)
@@ -31,8 +34,11 @@ async function tryStandardPaths(
   
   const standardPaths = [
     '/sitemap.xml',
+    '/sitemap.xml.gz',
     '/sitemap_index.xml',
-    '/sitemap-index.xml'
+    '/sitemap_index.xml.gz',
+    '/sitemap-index.xml',
+    '/sitemap-index.xml.gz'
   ];
   
   // Try all standard paths concurrently
@@ -149,7 +155,7 @@ async function parseRobotsTxt(
  * Handles both standard <sitemapindex> format and malformed <urlset> format.
  * 
  * For malformed indices (using <urlset> instead of <sitemapindex>), uses a heuristic:
- * checks if the majority of the first 5 URLs end in .xml or contain 'sitemap'.
+ * checks if the majority of the first 5 URLs end in .xml/.xml.gz or contain 'sitemap'.
  * 
  * @param xmlContent - Raw XML content of the sitemap
  * @returns true if content is a sitemap index, false if it's a regular sitemap
@@ -173,7 +179,7 @@ function isSitemapIndex(xmlContent: string): boolean {
     
     for (let i = 0; i < samplesToCheck; i++) {
       const url = matches[i][1].trim().toLowerCase();
-      if (url.includes('sitemap') || url.endsWith('.xml')) {
+      if (url.includes('sitemap') || url.endsWith('.xml') || url.endsWith('.xml.gz')) {
         sitemapLikeCount++;
       }
     }
@@ -191,7 +197,8 @@ function isSitemapIndex(xmlContent: string): boolean {
  * 1. Standard: <sitemapindex><sitemap><loc>...</loc></sitemap></sitemapindex>
  * 2. Malformed: <urlset><url><loc>sitemap.xml</loc></url></urlset>
  * 
- * For malformed indices, only extracts URLs that look like sitemaps (contain 'sitemap' or end in .xml).
+ * For malformed indices, only extracts URLs that look like sitemaps 
+ * (contain 'sitemap' or end in .xml/.xml.gz).
  * Validates all URLs before returning them.
  * 
  * @param xmlContent - Raw XML content of the sitemap index
@@ -228,8 +235,10 @@ function extractSitemapIndexUrls(xmlContent: string): string[] {
       if (locMatch) {
         const url = locMatch[1].trim();
         
-        // Check if this URL looks like a sitemap (ends with .xml or contains 'sitemap')
-        if (url.toLowerCase().includes('sitemap') || url.toLowerCase().endsWith('.xml')) {
+        // Check if this URL looks like a sitemap (ends with .xml, .xml.gz, or contains 'sitemap')
+        if (url.toLowerCase().includes('sitemap') || 
+            url.toLowerCase().endsWith('.xml') || 
+            url.toLowerCase().endsWith('.xml.gz')) {
           try {
             new URL(url);
             urls.push(url);
@@ -331,8 +340,9 @@ async function discoverAllSitemaps(
     }
     
     // Safety check
-    if (processed.size > 1000) {
-      console.warn(`⚠️  Processed over 1000 sitemap URLs. Stopping to prevent excessive requests.`);
+    const maxSitemaps = config.maxSitemaps || 1000;
+    if (processed.size > maxSitemaps) {
+      console.warn(`⚠️  Processed over ${maxSitemaps} sitemap URLs. Stopping to prevent excessive requests.`);
       break;
     }
   }

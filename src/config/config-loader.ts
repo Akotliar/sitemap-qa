@@ -83,6 +83,40 @@ function mergeCliOptions(config: Partial<Config>, cliOptions: Record<string, any
     merged.acceptedPatterns = cliOptions.acceptedPatterns.split(',').map((p: string) => p.trim()).filter(Boolean);
   }
   
+  // Performance and concurrency options
+  if (cliOptions.riskDetectionConcurrency !== undefined) {
+    merged.riskDetectionConcurrency = cliOptions.riskDetectionConcurrency;
+  }
+  
+  if (cliOptions.riskDetectionBatchSize !== undefined) {
+    merged.riskDetectionBatchSize = cliOptions.riskDetectionBatchSize;
+  }
+  
+  if (cliOptions.parsingConcurrency !== undefined) {
+    merged.parsingConcurrency = cliOptions.parsingConcurrency;
+  }
+  
+  if (cliOptions.discoveryConcurrency !== undefined) {
+    merged.discoveryConcurrency = cliOptions.discoveryConcurrency;
+  }
+  
+  if (cliOptions.maxSitemaps !== undefined) {
+    merged.maxSitemaps = cliOptions.maxSitemaps;
+  }
+  
+  // Progress and output options
+  if (cliOptions.progressBar !== undefined) {
+    merged.progressBar = cliOptions.progressBar;
+  }
+  
+  if (cliOptions.silent !== undefined) {
+    merged.silent = cliOptions.silent;
+  }
+  
+  if (cliOptions.benchmark !== undefined) {
+    merged.benchmark = cliOptions.benchmark;
+  }
+  
   return merged;
 }
 
