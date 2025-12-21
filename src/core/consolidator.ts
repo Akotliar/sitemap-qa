@@ -1,18 +1,57 @@
 import { UrlEntry } from '@/core/parser';
 
+/**
+ * Result of URL consolidation operation containing deduplicated URLs and statistics.
+ * 
+ * @interface ConsolidatedResult
+ */
 export interface ConsolidatedResult {
-  uniqueUrls: UrlEntry[]; // Deduplicated URLs
-  totalInputUrls: number; // Original count before deduplication
-  duplicatesRemoved: number; // Number of duplicates removed
-  duplicateGroups?: DuplicateGroup[]; // Optional: groups of duplicates for debugging
+  /** Deduplicated array of unique URLs after consolidation */
+  uniqueUrls: UrlEntry[];
+  
+  /** Original count of URLs before deduplication was applied */
+  totalInputUrls: number;
+  
+  /** Number of duplicate URLs that were removed during consolidation */
+  duplicatesRemoved: number;
+  
+  /** Optional groups of duplicates for debugging and analysis purposes */
+  duplicateGroups?: DuplicateGroup[];
 }
 
+/**
+ * Information about a group of duplicate URLs found during consolidation.
+ * Used for debugging and identifying which URLs appear multiple times across sitemaps.
+ * 
+ * @interface DuplicateGroup
+ */
 export interface DuplicateGroup {
-  url: string; // The canonical URL
-  count: number; // How many times it appeared
-  sources: string[]; // Which sitemaps contained it
+  /** The canonical (normalized) URL that represents this duplicate group */
+  url: string;
+  
+  /** Number of times this URL appeared across all input sources */
+  count: number;
+  
+  /** List of sitemap sources that contained this URL */
+  sources: string[];
 }
 
+/**
+ * Configuration options for URL normalization during consolidation.
+ * 
+ * These normalization rules are based on:
+ * - **Web Standards**: RFC 3986 (URI Syntax), RFC 3987 (IRIs), WHATWG URL Standard
+ * - **Industry Best Practices**: Google Search Central guidelines, SEO canonicalization standards
+ * - **Sitemap-Specific Requirements**: Fragment handling, tracking parameter removal
+ * - **Real-World Issues**: www/non-www duplicates, protocol variations, case sensitivity
+ * 
+ * @see {@link https://tools.ietf.org/html/rfc3986 RFC 3986: URI Generic Syntax}
+ * @see {@link https://tools.ietf.org/html/rfc3987 RFC 3987: IRIs}
+ * @see {@link https://url.spec.whatwg.org/ WHATWG URL Standard}
+ * @see {@link https://developers.google.com/search/docs/advanced/guidelines/url-structure Google URL Structure Guidelines}
+ * 
+ * @interface NormalizationOptions
+ */
 export interface NormalizationOptions {
   /**
    * Remove 'www.' prefix from domains
@@ -92,6 +131,18 @@ export interface NormalizationOptions {
   customNormalizer?: (url: URL) => URL;
 }
 
+/**
+ * Default normalization options providing a balanced "moderate" preset.
+ * 
+ * This preset balances correctness with safety:
+ * - Applies standards-based normalizations (lowercase domains, default ports)
+ * - Removes sitemap-irrelevant data (hashes, empty query params)
+ * - Preserves protocol and path case (conservative approach)
+ * - Does not remove tracking parameters by default (user opt-in)
+ * 
+ * For stricter normalization (e.g., removing utm_* parameters, forcing HTTPS),
+ * pass custom options to `consolidateUrls()` or `normalizeUrl()`.
+ */
 export const DEFAULT_NORMALIZATION_OPTIONS: Required<NormalizationOptions> = {
   removeWww: true,
   preferHttps: false,
@@ -109,7 +160,19 @@ export const DEFAULT_NORMALIZATION_OPTIONS: Required<NormalizationOptions> = {
 };
 
 /**
- * Safely decode URI component, avoiding reserved characters
+ * Safely decodes percent-encoded characters in a URI component while preserving reserved characters.
+ * 
+ * Only decodes unreserved characters (A-Z, a-z, 0-9, -, _, ., ~) and leaves reserved characters
+ * (: / ? # [ ] @ ! $ & ' ( ) * + , ; =) encoded to avoid breaking URL structure.
+ * 
+ * @param str - The URI component string to decode
+ * @returns The decoded string with only unreserved characters decoded
+ * 
+ * @example
+ * ```typescript
+ * safeDecodeURIComponent('hello%20world') // Returns: 'hello world'
+ * safeDecodeURIComponent('path%2Fto%2Ffile') // Returns: 'path%2Fto%2Ffile' (preserves /)
+ * ```
  */
 function safeDecodeURIComponent(str: string): string {
   try {
@@ -131,6 +194,30 @@ function safeDecodeURIComponent(str: string): string {
   }
 }
 
+/**
+ * Normalizes a URL according to specified options for consistent comparison and deduplication.
+ * 
+ * Applies various normalization rules including:
+ * - Domain normalization (www removal, case, IDN/Punycode)
+ * - Protocol normalization (HTTP/HTTPS preference)
+ * - Port normalization (removing default ports)
+ * - Path normalization (case, percent-encoding, trailing slashes)
+ * - Query parameter normalization (sorting, removal, empty params)
+ * - Hash/fragment handling
+ * 
+ * @param url - The URL string to normalize
+ * @param options - Optional normalization settings (merged with defaults)
+ * @returns The normalized URL string, or original URL if parsing fails
+ * 
+ * @example
+ * ```typescript
+ * normalizeUrl('HTTP://WWW.Example.com/Path/', { removeWww: true, lowercaseDomain: true })
+ * // Returns: 'http://example.com/Path'
+ * 
+ * normalizeUrl('https://example.com/page?z=1&a=2', { sortQueryParams: true })
+ * // Returns: 'https://example.com/page?a=2&z=1'
+ * ```
+ */
 export function normalizeUrl(
   url: string,
   options: NormalizationOptions = {}
@@ -242,6 +329,29 @@ export function normalizeUrl(
   }
 }
 
+/**
+ * Merges multiple URL entries that represent the same normalized URL into a single entry.
+ * 
+ * Merging strategy:
+ * - Uses first entry as base
+ * - Concatenates all sources
+ * - Selects most recent lastmod date
+ * - Selects highest priority value
+ * - Selects most frequent changefreq (or first if tie)
+ * - Selects most recent extractedAt timestamp
+ * 
+ * @param entries - Array of URL entries to merge (must have at least one entry)
+ * @returns A single merged UrlEntry combining data from all input entries
+ * 
+ * @example
+ * ```typescript
+ * const merged = mergeUrlEntries([
+ *   { loc: 'https://example.com', source: 'sitemap1.xml', priority: 0.8 },
+ *   { loc: 'https://example.com', source: 'sitemap2.xml', priority: 0.9 }
+ * ])
+ * // Returns: { loc: 'https://example.com', source: 'sitemap1.xml, sitemap2.xml', priority: 0.9 }
+ * ```
+ */
 function mergeUrlEntries(entries: UrlEntry[]): UrlEntry {
   if (entries.length === 1) return entries[0];
 
@@ -300,6 +410,36 @@ function mergeUrlEntries(entries: UrlEntry[]): UrlEntry {
   return merged;
 }
 
+/**
+ * Consolidates an array of URLs by normalizing and deduplicating them.
+ * 
+ * This is the main consolidation function that:
+ * 1. Normalizes each URL according to provided options
+ * 2. Groups URLs by their normalized form
+ * 3. Merges duplicate entries intelligently (keeping best metadata)
+ * 4. Optionally tracks duplicate groups for analysis
+ * 5. Returns consolidated results with statistics
+ * 
+ * @param urls - Array of URL entries to consolidate
+ * @param options - Consolidation configuration
+ * @param options.verbose - Enable console logging of consolidation progress (default: false)
+ * @param options.trackDuplicates - Track and return duplicate groups for analysis (default: true)
+ * @param options.normalization - URL normalization options to apply
+ * @returns Consolidated result containing unique URLs and deduplication statistics
+ * 
+ * @example
+ * ```typescript
+ * const result = consolidateUrls([
+ *   { loc: 'http://example.com/', source: 'sitemap1.xml' },
+ *   { loc: 'https://example.com', source: 'sitemap2.xml' }
+ * ], {
+ *   normalization: { removeTrailingSlash: true }
+ * })
+ * 
+ * console.log(result.uniqueUrls.length) // 1 (deduplicated)
+ * console.log(result.duplicatesRemoved) // 1
+ * ```
+ */
 export function consolidateUrls(
   urls: UrlEntry[],
   options: {
