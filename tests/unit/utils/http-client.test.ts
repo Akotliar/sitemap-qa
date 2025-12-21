@@ -1,7 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+// Mock axios before importing http-client
+vi.mock('axios', () => {
+  const mockAxiosInstance = {
+    get: vi.fn()
+  };
+  return {
+    default: {
+      create: vi.fn(() => mockAxiosInstance)
+    }
+  };
+});
+
 // Mock Playwright to prevent actual browser launches in tests
-// This must be before importing http-client
 vi.mock('playwright', () => ({
   chromium: {
     launch: vi.fn().mockRejectedValue(new Error('Playwright not available in tests'))
@@ -10,9 +21,10 @@ vi.mock('playwright', () => ({
 
 import { fetchUrl } from '@/utils/http-client';
 import { HttpError, NetworkError } from '@/errors/network-errors';
+import axios from 'axios';
 
-// Mock global fetch
-global.fetch = vi.fn();
+// Get the mocked axios instance
+const mockAxiosInstance = (axios.create as any)();
 
 describe('fetchUrl', () => {
   beforeEach(() => {
@@ -20,12 +32,12 @@ describe('fetchUrl', () => {
   });
   
   it('should return content on successful request', async () => {
-    // Mock fetch to return 200
-    vi.mocked(global.fetch).mockResolvedValueOnce({
+    // Mock axios instance get to return 200
+    mockAxiosInstance.get.mockResolvedValueOnce({
       status: 200,
-      url: 'https://example.com/sitemap.xml',
-      text: async () => '<urlset></urlset>'
-    } as any);
+      data: '<urlset></urlset>',
+      request: { res: { responseUrl: 'https://example.com/sitemap.xml' } }
+    });
     
     const result = await fetchUrl('https://example.com/sitemap.xml');
     expect(result.statusCode).toBe(200);
@@ -33,29 +45,28 @@ describe('fetchUrl', () => {
   });
   
   it('should throw HttpError immediately on 404 without retry', async () => {
-    // Mock fetch to return 404
-    vi.mocked(global.fetch).mockResolvedValueOnce({
+    mockAxiosInstance.get.mockResolvedValueOnce({
       status: 404,
-      url: 'https://example.com/missing.xml',
-      text: async () => 'Not Found'
-    } as any);
+      data: 'Not Found',
+      request: { res: { responseUrl: 'https://example.com/missing.xml' } }
+    });
     
     await expect(fetchUrl('https://example.com/missing.xml'))
       .rejects.toThrow(HttpError);
     
     // Verify only 1 attempt was made (no retries)
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(mockAxiosInstance.get).toHaveBeenCalledTimes(1);
   });
   
   it('should retry 3 times on 500 error', async () => {
     vi.useFakeTimers();
     
-    // Mock fetch to return 500 on all attempts
-    vi.mocked(global.fetch).mockResolvedValue({
+    // Mock axios to return 500 on all attempts
+    mockAxiosInstance.get.mockResolvedValue({
       status: 500,
-      url: 'https://example.com/sitemap.xml',
-      text: async () => 'Internal Server Error'
-    } as any);
+      data: 'Internal Server Error',
+      request: { res: { responseUrl: 'https://example.com/error.xml' } }
+    });
     
     const promise = fetchUrl('https://example.com/error.xml', { retryDelay: 100 }).catch(() => {});
     
@@ -64,7 +75,7 @@ describe('fetchUrl', () => {
     await promise;
     
     // Verify 4 total attempts (1 initial + 3 retries)
-    expect(global.fetch).toHaveBeenCalledTimes(4);
+    expect(mockAxiosInstance.get).toHaveBeenCalledTimes(4);
     
     vi.useRealTimers();
   });
@@ -72,12 +83,12 @@ describe('fetchUrl', () => {
   it('should use exponential backoff (1s, 2s, 4s)', async () => {
     vi.useFakeTimers();
     
-    // Mock fetch to return 503
-    vi.mocked(global.fetch).mockResolvedValue({
+    // Mock axios to return 503
+    mockAxiosInstance.get.mockResolvedValue({
       status: 503,
-      url: 'https://example.com/error.xml',
-      text: async () => 'Service Unavailable'
-    } as any);
+      data: 'Service Unavailable',
+      request: { res: { responseUrl: 'https://example.com/error.xml' } }
+    });
     
     const promise = fetchUrl('https://example.com/error.xml').catch(() => {});
     
@@ -93,8 +104,8 @@ describe('fetchUrl', () => {
   it('should throw NetworkError on connection failure', async () => {
     vi.useFakeTimers();
     
-    // Mock fetch to throw ECONNREFUSED
-    vi.mocked(global.fetch).mockRejectedValue(
+    // Mock axios to throw ECONNREFUSED
+    mockAxiosInstance.get.mockRejectedValue(
       Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' })
     );
     
@@ -109,9 +120,9 @@ describe('fetchUrl', () => {
   it('should respect timeout option', async () => {
     vi.useFakeTimers();
     
-    // Mock fetch to be aborted (timeout)
-    vi.mocked(global.fetch).mockRejectedValue(
-      new DOMException('The operation was aborted', 'AbortError')
+    // Mock axios to be aborted (timeout)
+    mockAxiosInstance.get.mockRejectedValue(
+      Object.assign(new Error('timeout of 1000ms exceeded'), { code: 'ECONNABORTED' })
     );
     
     const promise = fetchUrl('https://example.com', { timeout: 1, retryDelay: 100 }).catch(e => e);
@@ -123,24 +134,24 @@ describe('fetchUrl', () => {
   });
   
   it('should succeed on second attempt after first fails', async () => {
-    // Mock fetch to fail once (500), then succeed (200)
-    vi.mocked(global.fetch)
+    // Mock axios to fail once (500), then succeed (200)
+    mockAxiosInstance.get
       .mockResolvedValueOnce({
         status: 500,
-        url: 'https://example.com/flaky.xml',
-        text: async () => 'Error'
-      } as any)
+        data: 'Error',
+        request: { res: { responseUrl: 'https://example.com/flaky.xml' } }
+      })
       .mockResolvedValueOnce({
         status: 200,
-        url: 'https://example.com/flaky.xml',
-        text: async () => '<urlset></urlset>'
-      } as any);
+        data: '<urlset></urlset>',
+        request: { res: { responseUrl: 'https://example.com/flaky.xml' } }
+      });
     
     const result = await fetchUrl('https://example.com/flaky.xml');
     expect(result.statusCode).toBe(200);
     
     // Verify 2 attempts were made
-    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(mockAxiosInstance.get).toHaveBeenCalledTimes(2);
   });
   
   it('should validate URL before making request', async () => {
@@ -152,41 +163,41 @@ describe('fetchUrl', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(TypeError);
       // Should not have made any requests
-      expect(global.fetch).not.toHaveBeenCalled();
+      expect(mockAxiosInstance.get).not.toHaveBeenCalled();
     }
   });
   
   it('should retry on 429 rate limit error', async () => {
-    // Mock fetch to return 429 twice, then succeed
-    vi.mocked(global.fetch)
+    // Mock axios to return 429 twice, then succeed
+    mockAxiosInstance.get
       .mockResolvedValueOnce({
         status: 429,
-        url: 'https://example.com/sitemap.xml',
-        text: async () => 'Too Many Requests'
-      } as any)
+        data: 'Too Many Requests',
+        request: { res: { responseUrl: 'https://example.com/sitemap.xml' } }
+      })
       .mockResolvedValueOnce({
         status: 429,
-        url: 'https://example.com/sitemap.xml',
-        text: async () => 'Too Many Requests'
-      } as any)
+        data: 'Too Many Requests',
+        request: { res: { responseUrl: 'https://example.com/sitemap.xml' } }
+      })
       .mockResolvedValueOnce({
         status: 200,
-        url: 'https://example.com/sitemap.xml',
-        text: async () => '<urlset></urlset>'
-      } as any);
+        data: '<urlset></urlset>',
+        request: { res: { responseUrl: 'https://example.com/sitemap.xml' } }
+      });
     
     const result = await fetchUrl('https://example.com/sitemap.xml');
     expect(result.statusCode).toBe(200);
-    expect(global.fetch).toHaveBeenCalledTimes(3);
+    expect(mockAxiosInstance.get).toHaveBeenCalledTimes(3);
   });
   
   it('should include status code in HttpError', async () => {
-    // Mock fetch to return 404
-    vi.mocked(global.fetch).mockResolvedValueOnce({
+    // Mock axios to return 404
+    mockAxiosInstance.get.mockResolvedValueOnce({
       status: 404,
-      url: 'https://example.com/missing.xml',
-      text: async () => 'Not Found'
-    } as any);
+      data: 'Not Found',
+      request: { res: { responseUrl: 'https://example.com/missing.xml' } }
+    });
     
     try {
       await fetchUrl('https://example.com/missing.xml');
@@ -203,7 +214,7 @@ describe('fetchUrl', () => {
     
     const originalError = Object.assign(new Error('ENOTFOUND'), { code: 'ENOTFOUND' });
     
-    vi.mocked(global.fetch).mockRejectedValue(originalError);
+    mockAxiosInstance.get.mockRejectedValue(originalError);
     
     const promise = fetchUrl('https://invalid-domain.com', { retryDelay: 100 }).catch(e => e);
     await vi.runAllTimersAsync();

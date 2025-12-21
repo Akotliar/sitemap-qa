@@ -5,7 +5,7 @@ const packageJson = JSON.parse(readFileSync('./package.json', 'utf-8'));
 
 export default defineConfig({
   entry: ['src/index.ts'],
-  format: ['esm', 'cjs'],
+  format: ['esm'],
   dts: true,
   splitting: false,
   sourcemap: true,
@@ -13,7 +13,7 @@ export default defineConfig({
   minify: false,
   shims: true,
   platform: 'node',
-  external: ['cli-progress'],
+  external: ['playwright', 'playwright-core'],
   define: {
     '__PACKAGE_VERSION__': JSON.stringify(packageJson.version),
   },

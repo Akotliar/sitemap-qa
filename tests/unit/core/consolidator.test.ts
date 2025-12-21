@@ -19,8 +19,14 @@ describe('normalizeUrl', () => {
     );
   });
 
-  it('should preserve fragment identifiers', () => {
+  it('should remove fragment identifiers by default', () => {
     expect(normalizeUrl('https://example.com/page#section')).toBe(
+      'https://example.com/page'
+    );
+  });
+
+  it('should preserve fragment identifiers when configured', () => {
+    expect(normalizeUrl('https://example.com/page#section', { removeHash: false })).toBe(
       'https://example.com/page#section'
     );
   });
@@ -132,7 +138,7 @@ describe('consolidateUrls', () => {
     expect(result.duplicatesRemoved).toBe(0);
   });
 
-  it('should handle mixed case URLs distinctly', () => {
+  it('should handle mixed case URLs distinctly in path', () => {
     const urls: UrlEntry[] = [
       { loc: 'https://example.com/Page', source: 'sitemap1.xml' },
       { loc: 'https://example.com/page', source: 'sitemap2.xml' },
@@ -140,7 +146,7 @@ describe('consolidateUrls', () => {
 
     const result = consolidateUrls(urls);
 
-    // URLs are case-sensitive
+    // URL paths are case-sensitive by default
     expect(result.uniqueUrls).toHaveLength(2);
   });
 
