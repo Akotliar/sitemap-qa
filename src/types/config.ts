@@ -4,6 +4,7 @@ export interface Config {
   concurrency: number;          // Concurrent sitemap fetches
   parsingConcurrency?: number;  // Concurrent sitemap parsing (default: 50)
   discoveryConcurrency?: number; // Concurrent sitemap index discovery (default: 50)
+  maxSitemaps?: number;         // Maximum number of sitemaps to process (default: 1000)
   
   // Output settings
   outputFormat: 'json' | 'html';
@@ -29,6 +30,7 @@ export const DEFAULT_CONFIG: Config = {
   concurrency: 10,
   parsingConcurrency: 50,  // Optimized for network-bound parallel parsing
   discoveryConcurrency: 50,  // Optimized for recursive sitemap index discovery
+  maxSitemaps: 1000,  // Prevent excessive sitemap discovery
   outputFormat: 'html',
   outputDir: './sitemap-qa/report',
   verbose: false,

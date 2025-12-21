@@ -226,4 +226,47 @@ describe('fetchUrl', () => {
     
     vi.useRealTimers();
   });
+
+  it('should decompress .xml.gz files automatically', async () => {
+    // Import gzip to create test data
+    const { gzipSync } = await import('zlib');
+    
+    const xmlContent = '<?xml version="1.0"?><urlset><url><loc>https://example.com/page</loc></url></urlset>';
+    const gzippedData = gzipSync(Buffer.from(xmlContent));
+    
+    mockAxiosInstance.get.mockResolvedValueOnce({
+      status: 200,
+      data: gzippedData,
+      request: { res: { responseUrl: 'https://example.com/sitemap.xml.gz' } }
+    });
+    
+    const result = await fetchUrl('https://example.com/sitemap.xml.gz');
+    
+    expect(result.statusCode).toBe(200);
+    expect(result.content).toBe(xmlContent);
+    // Verify it requested as arraybuffer for .gz files
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith(
+      'https://example.com/sitemap.xml.gz',
+      expect.objectContaining({
+        responseType: 'arraybuffer'
+      })
+    );
+  });
+
+  it('should use text response type for non-gzipped files', async () => {
+    mockAxiosInstance.get.mockResolvedValueOnce({
+      status: 200,
+      data: '<urlset></urlset>',
+      request: { res: { responseUrl: 'https://example.com/sitemap.xml' } }
+    });
+    
+    await fetchUrl('https://example.com/sitemap.xml');
+    
+    expect(mockAxiosInstance.get).toHaveBeenCalledWith(
+      'https://example.com/sitemap.xml',
+      expect.objectContaining({
+        responseType: 'text'
+      })
+    );
+  });
 });

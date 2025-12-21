@@ -3,6 +3,7 @@ import { chromium } from 'playwright';
 import axios from 'axios';
 import { Agent as HttpAgent } from 'http';
 import { Agent as HttpsAgent } from 'https';
+import { gunzipSync } from 'zlib';
 
 // Create persistent HTTP agents for connection pooling
 const httpAgent = new HttpAgent({ 
@@ -169,8 +170,12 @@ export async function fetchUrl(
       }
       
       // Use axios with connection pooling for better performance
+      // For .xml.gz files, we need to get binary data and decompress manually
+      const isGzipped = url.toLowerCase().endsWith('.xml.gz');
+      
       const response = await axiosInstance.get(url, {
         timeout: timeout * 1000,
+        responseType: isGzipped ? 'arraybuffer' : 'text',
         headers: {
           'User-Agent': 'sitemap-qa/1.0.0 (compatible; +https://github.com/Akotliar/sitemap-qa)',
           'Accept': 'text/xml,application/xml,text/plain,*/*',
@@ -180,7 +185,17 @@ export async function fetchUrl(
       });
       
       const statusCode = response.status;
-      const body = response.data;
+      let body = response.data;
+      
+      // Decompress .xml.gz files manually
+      if (isGzipped && statusCode >= 200 && statusCode < 300) {
+        try {
+          const buffer = Buffer.isBuffer(body) ? body : Buffer.from(body);
+          body = gunzipSync(buffer).toString('utf-8');
+        } catch (error) {
+          throw new Error(`Failed to decompress gzipped content from ${url}: ${error}`);
+        }
+      }
       
       // Success - return result
       if (statusCode >= 200 && statusCode < 300) {

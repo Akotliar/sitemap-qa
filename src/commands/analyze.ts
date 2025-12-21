@@ -65,6 +65,7 @@ export const analyzeCommand = new Command('analyze')
   .option('--batch-size <number>', 'URLs per batch for risk detection', '10000')
   .option('--parsing-concurrency <number>', 'Number of concurrent sitemap parsers', '50')
   .option('--discovery-concurrency <number>', 'Number of concurrent sitemap index fetches', '50')
+  .option('--max-sitemaps <number>', 'Maximum number of sitemaps to process', '1000')
   .option('--silent', 'Disable all progress output')
   .option('--benchmark', 'Save performance profile')
   .option('--no-color', 'Disable ANSI color codes in CLI output')
@@ -85,6 +86,7 @@ export const analyzeCommand = new Command('analyze')
         riskDetectionBatchSize: options.batchSize ? parseInt(options.batchSize) : undefined,
         parsingConcurrency: options.parsingConcurrency ? parseInt(options.parsingConcurrency) : undefined,
         discoveryConcurrency: options.discoveryConcurrency ? parseInt(options.discoveryConcurrency) : undefined,
+        maxSitemaps: options.maxSitemaps ? parseInt(options.maxSitemaps) : undefined,
         silent: options.silent,
         benchmark: options.benchmark,
         progressBar: options.progress,

@@ -183,6 +183,9 @@ Create a `.sitemap-qa.config.json` file in your project root or `~/.sitemap-qa/c
 |--------|------|---------|-------------|
 | `timeout` | number | `30` | HTTP request timeout in seconds (1-300) |
 | `concurrency` | number | `10` | Number of concurrent HTTP requests |
+| `parsingConcurrency` | number | `50` | Number of concurrent sitemap parsers |
+| `discoveryConcurrency` | number | `50` | Number of concurrent sitemap index fetches |
+| `maxSitemaps` | number | `1000` | Maximum number of sitemaps to process |
 | `outputFormat` | string | `"html"` | Output format: `"html"` or `"json"` |
 | `outputDir` | string | `"./sitemap-qa/report"` | Directory for generated reports |
 | `verbose` | boolean | `false` | Enable detailed logging |

@@ -383,3 +383,124 @@ Sitemap: https://example.com/bad.xml`;
     ]);
   });
 });
+
+describe('discoverSitemaps - gzipped sitemap support', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should discover gzipped sitemap at /sitemap.xml.gz', async () => {
+    vi.spyOn(httpClient, 'fetchUrl').mockImplementation(async (url: string) => {
+      if (url === 'https://example.com/robots.txt') {
+        throw new HttpError(url, 404);
+      }
+      if (url === 'https://example.com/sitemap.xml.gz') {
+        return { content: '<urlset></urlset>', statusCode: 200, url };
+      }
+      throw new HttpError(url, 404);
+    });
+    
+    const result = await discoverSitemaps('https://example.com', DEFAULT_CONFIG);
+    
+    expect(result.sitemaps).toEqual(['https://example.com/sitemap.xml.gz']);
+    expect(result.source).toBe('standard-path');
+  });
+
+  it('should extract .xml.gz URLs from robots.txt', async () => {
+    const robotsContent = `User-agent: *
+Disallow: /admin/
+
+Sitemap: https://example.com/sitemap.xml.gz
+Sitemap: https://example.com/news/sitemap.xml.gz`;
+    
+    vi.spyOn(httpClient, 'fetchUrl')
+      .mockResolvedValueOnce({ content: robotsContent, statusCode: 200, url: 'https://example.com/robots.txt' })
+      .mockResolvedValueOnce({ content: '<urlset></urlset>', statusCode: 200, url: 'https://example.com/sitemap.xml.gz' })
+      .mockResolvedValueOnce({ content: '<urlset></urlset>', statusCode: 200, url: 'https://example.com/news/sitemap.xml.gz' });
+    
+    const result = await discoverSitemaps('https://example.com', DEFAULT_CONFIG);
+    
+    expect(result.sitemaps).toEqual([
+      'https://example.com/sitemap.xml.gz',
+      'https://example.com/news/sitemap.xml.gz'
+    ]);
+    expect(result.source).toBe('robots-txt');
+  });
+
+  it('should detect .xml.gz files in sitemap index', async () => {
+    const indexContent = `<sitemapindex>
+  <sitemap><loc>https://example.com/sitemap1.xml.gz</loc></sitemap>
+  <sitemap><loc>https://example.com/sitemap2.xml.gz</loc></sitemap>
+</sitemapindex>`;
+    
+    const regularContent = '<urlset><url><loc>https://example.com/page1</loc></url></urlset>';
+    
+    vi.spyOn(httpClient, 'fetchUrl').mockImplementation(async (url: string) => {
+      if (url === 'https://example.com/robots.txt') {
+        throw new HttpError(url, 404);
+      }
+      if (url === 'https://example.com/sitemap.xml') {
+        return { content: indexContent, statusCode: 200, url };
+      }
+      if (url === 'https://example.com/sitemap1.xml.gz' || url === 'https://example.com/sitemap2.xml.gz') {
+        return { content: regularContent, statusCode: 200, url };
+      }
+      throw new HttpError(url, 404);
+    });
+    
+    const result = await discoverSitemaps('https://example.com', DEFAULT_CONFIG);
+    
+    expect(result.sitemaps).toEqual([
+      'https://example.com/sitemap1.xml.gz',
+      'https://example.com/sitemap2.xml.gz'
+    ]);
+  });
+
+  it('should handle mixed .xml and .xml.gz sitemaps', async () => {
+    const robotsContent = `Sitemap: https://example.com/regular.xml
+Sitemap: https://example.com/compressed.xml.gz`;
+    
+    vi.spyOn(httpClient, 'fetchUrl')
+      .mockResolvedValueOnce({ content: robotsContent, statusCode: 200, url: 'robots.txt' })
+      .mockResolvedValueOnce({ content: '<urlset></urlset>', statusCode: 200, url: 'regular.xml' })
+      .mockResolvedValueOnce({ content: '<urlset></urlset>', statusCode: 200, url: 'compressed.xml.gz' });
+    
+    const result = await discoverSitemaps('https://example.com', DEFAULT_CONFIG);
+    
+    expect(result.sitemaps).toEqual([
+      'https://example.com/regular.xml',
+      'https://example.com/compressed.xml.gz'
+    ]);
+  });
+
+  it('should detect malformed index with .xml.gz URLs', async () => {
+    const malformedIndex = `<urlset>
+  <url><loc>https://example.com/sitemap-products.xml.gz</loc></url>
+  <url><loc>https://example.com/sitemap-categories.xml.gz</loc></url>
+</urlset>`;
+    
+    const regularSitemap = '<urlset><url><loc>https://example.com/product1</loc></url></urlset>';
+    
+    vi.spyOn(httpClient, 'fetchUrl').mockImplementation(async (url: string) => {
+      if (url === 'https://example.com/robots.txt') {
+        throw new HttpError(url, 404);
+      }
+      if (url === 'https://example.com/sitemap.xml') {
+        return { content: malformedIndex, statusCode: 200, url };
+      }
+      if (url === 'https://example.com/sitemap-products.xml.gz' || 
+          url === 'https://example.com/sitemap-categories.xml.gz') {
+        return { content: regularSitemap, statusCode: 200, url };
+      }
+      throw new HttpError(url, 404);
+    });
+    
+    const result = await discoverSitemaps('https://example.com', DEFAULT_CONFIG);
+    
+    // Should detect malformed index and extract gzipped child sitemaps
+    expect(result.sitemaps).toEqual([
+      'https://example.com/sitemap-products.xml.gz',
+      'https://example.com/sitemap-categories.xml.gz',
+    ]);
+  });
+});
