@@ -37,6 +37,9 @@ export async function processInBatches<T, R>(
   let currentIndex = 0;
   const errors: Array<{index: number; error: any}> = [];
   
+  // Track when to call progress callback (every batch)
+  let lastProgressUpdate = 0;
+  
   // Create worker pool
   const workers = Array(Math.min(concurrency, items.length))
     .fill(null)
@@ -48,25 +51,35 @@ export async function processInBatches<T, R>(
         try {
           results[index] = await processor(item);
         } catch (error) {
-          // Store error but don't stop worker - let it continue processing
+          // Store error and will throw after all workers complete
           errors.push({ index, error });
-          // Set a placeholder result (will be handled by caller)
+          // Set a placeholder result
           results[index] = null as any;
         }
         
         completed++;
+        
+        // Call progress callback only when we complete a full batch
         if (onProgress) {
-          onProgress(completed, items.length);
+          const batchesDone = Math.floor(completed / concurrency);
+          const shouldUpdate = batchesDone > lastProgressUpdate || completed === items.length;
+          
+          if (shouldUpdate && completed % concurrency === 0) {
+            lastProgressUpdate = batchesDone;
+            onProgress(completed, items.length);
+          } else if (completed === items.length && completed % concurrency !== 0) {
+            // Handle final partial batch
+            onProgress(completed, items.length);
+          }
         }
       }
     });
   
   await Promise.all(workers);
   
-  // If there were errors, throw the first one for backward compatibility
-  // but only after all work is done
+  // If there were errors, throw the first one
   if (errors.length > 0) {
-    console.warn(`Processed ${items.length} items with ${errors.length} errors`);
+    throw errors[0].error;
   }
   
   return results;
