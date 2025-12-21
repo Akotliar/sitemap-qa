@@ -13,28 +13,231 @@ export interface DuplicateGroup {
   sources: string[]; // Which sitemaps contained it
 }
 
-export function normalizeUrl(url: string): string {
+export interface NormalizationOptions {
+  /**
+   * Remove 'www.' prefix from domains
+   * @default true
+   */
+  removeWww?: boolean;
+
+  /**
+   * Normalize to HTTPS when both HTTP and HTTPS exist
+   * @default false (preserve original protocol)
+   */
+  preferHttps?: boolean;
+
+  /**
+   * Remove hash/fragment from URLs
+   * @default true (fragments rarely matter for sitemaps)
+   */
+  removeHash?: boolean;
+
+  /**
+   * Convert domain to lowercase
+   * @default true (domains are case-insensitive)
+   */
+  lowercaseDomain?: boolean;
+
+  /**
+   * Convert path to lowercase
+   * @default false (paths are case-sensitive)
+   */
+  lowercasePath?: boolean;
+
+  /**
+   * Remove default ports (80 for HTTP, 443 for HTTPS)
+   * @default true
+   */
+  removeDefaultPorts?: boolean;
+
+  /**
+   * Decode percent-encoded characters when safe
+   * @default true
+   */
+  decodePercents?: boolean;
+
+  /**
+   * Convert IDN domains to ASCII (Punycode)
+   * @default true
+   */
+  normalizeIDN?: boolean;
+
+  /**
+   * Sort query parameters alphabetically
+   * @default true
+   */
+  sortQueryParams?: boolean;
+
+  /**
+   * Remove trailing slash (except for root path)
+   * @default true
+   */
+  removeTrailingSlash?: boolean;
+
+  /**
+   * Remove empty query parameters (e.g., ?key=)
+   * @default true
+   */
+  removeEmptyQueryParams?: boolean;
+
+  /**
+   * Remove query parameters matching these names
+   * @default [] (common examples: ['utm_source', 'utm_medium', 'fbclid'])
+   */
+  removeQueryParams?: string[];
+
+  /**
+   * Custom normalization function to apply after built-in rules
+   */
+  customNormalizer?: (url: URL) => URL;
+}
+
+export const DEFAULT_NORMALIZATION_OPTIONS: Required<NormalizationOptions> = {
+  removeWww: true,
+  preferHttps: false,
+  removeHash: true,
+  lowercaseDomain: true,
+  lowercasePath: false,
+  removeDefaultPorts: true,
+  decodePercents: true,
+  normalizeIDN: true,
+  sortQueryParams: true,
+  removeTrailingSlash: true,
+  removeEmptyQueryParams: true,
+  removeQueryParams: [],
+  customNormalizer: undefined as any,
+};
+
+/**
+ * Safely decode URI component, avoiding reserved characters
+ */
+function safeDecodeURIComponent(str: string): string {
   try {
+    // Decode unreserved characters only
+    // Reserved: : / ? # [ ] @ ! $ & ' ( ) * + , ; =
+    return str.replace(
+      /%([0-9A-Fa-f]{2})/g,
+      (match, hex) => {
+        const char = String.fromCharCode(parseInt(hex, 16));
+        // Only decode if it's an unreserved character
+        if (/[A-Za-z0-9\-_.~]/.test(char)) {
+          return char;
+        }
+        return match; // Keep encoded
+      }
+    );
+  } catch {
+    return str;
+  }
+}
+
+export function normalizeUrl(
+  url: string,
+  options: NormalizationOptions = {}
+): string {
+  // Merge with defaults
+  const opts = { ...DEFAULT_NORMALIZATION_OPTIONS, ...options };
+
+  try {
+    // Step 1: Parse URL
     const parsed = new URL(url);
 
-    // Remove trailing slash
+    // Step 2: Normalize domain
+    let hostname = parsed.hostname;
+    
+    if (opts.removeWww && hostname.startsWith('www.')) {
+      hostname = hostname.substring(4);
+    }
+    
+    if (opts.lowercaseDomain) {
+      hostname = hostname.toLowerCase();
+    }
+
+    if (opts.normalizeIDN) {
+      // Convert IDN to ASCII (Punycode)
+      // Note: URL API already does this, but explicit for clarity
+      hostname = new URL(`http://${hostname}`).hostname;
+    }
+
+    // Step 3: Normalize protocol
+    let protocol = parsed.protocol;
+    if (opts.preferHttps && protocol === 'http:') {
+      protocol = 'https:';
+    }
+
+    // Step 4: Normalize port
+    let port = parsed.port;
+    if (opts.removeDefaultPorts) {
+      if ((protocol === 'http:' && port === '80') ||
+          (protocol === 'https:' && port === '443')) {
+        port = '';
+      }
+    }
+
+    // Step 5: Normalize pathname
     let pathname = parsed.pathname;
-    if (pathname.endsWith('/') && pathname !== '/') {
+    
+    if (opts.decodePercents) {
+      // Decode percent-encoded characters (except reserved characters)
+      pathname = safeDecodeURIComponent(pathname);
+    }
+    
+    if (opts.lowercasePath) {
+      pathname = pathname.toLowerCase();
+    }
+    
+    if (opts.removeTrailingSlash && pathname.endsWith('/') && pathname !== '/') {
       pathname = pathname.slice(0, -1);
     }
 
-    // Sort query parameters alphabetically
-    const params = Array.from(parsed.searchParams.entries()).sort(([a], [b]) =>
-      a.localeCompare(b)
-    );
-    const sortedParams = new URLSearchParams(params);
+    // Step 6: Normalize query parameters
+    let searchParams = new URLSearchParams(parsed.search);
+    
+    if (opts.removeEmptyQueryParams) {
+      for (const [key, value] of Array.from(searchParams.entries())) {
+        if (value === '') {
+          searchParams.delete(key);
+        }
+      }
+    }
+    
+    if (opts.removeQueryParams && opts.removeQueryParams.length > 0) {
+      for (const param of opts.removeQueryParams) {
+        searchParams.delete(param);
+      }
+    }
 
-    // Reconstruct URL
-    return `${parsed.protocol}//${parsed.host}${pathname}${
-      sortedParams.toString() ? '?' + sortedParams.toString() : ''
-    }${parsed.hash}`;
-  } catch {
-    // If URL parsing fails, use original
+    let queryString = '';
+    if (opts.sortQueryParams) {
+      const sortedParams = Array.from(searchParams.entries()).sort(
+        ([a], [b]) => a.localeCompare(b)
+      );
+      if (sortedParams.length > 0) {
+        queryString = '?' + new URLSearchParams(sortedParams).toString();
+      }
+    } else if (searchParams.toString()) {
+      queryString = '?' + searchParams.toString();
+    }
+
+    // Step 7: Handle hash/fragment
+    const hash = opts.removeHash ? '' : parsed.hash;
+
+    // Step 8: Reconstruct URL
+    const portPart = port ? `:${port}` : '';
+    let normalized = `${protocol}//${hostname}${portPart}${pathname}${queryString}${hash}`;
+
+    // Step 9: Apply custom normalizer if provided
+    if (opts.customNormalizer) {
+      const customParsed = new URL(normalized);
+      const customNormalized = opts.customNormalizer(customParsed);
+      normalized = customNormalized.toString();
+    }
+
+    return normalized;
+  } catch (error) {
+    // If parsing fails, return original URL
+    // Could also throw error based on configuration
+    console.warn(`Failed to normalize URL: ${url}`, error);
     return url;
   }
 }
@@ -99,8 +302,13 @@ function mergeUrlEntries(entries: UrlEntry[]): UrlEntry {
 
 export function consolidateUrls(
   urls: UrlEntry[],
-  verbose: boolean = false
+  options: {
+    verbose?: boolean;
+    trackDuplicates?: boolean;
+    normalization?: NormalizationOptions;
+  } = {}
 ): ConsolidatedResult {
+  const { verbose = false, trackDuplicates = true, normalization } = options;
   const totalInputUrls = urls.length;
 
   if (verbose) {
@@ -111,7 +319,7 @@ export function consolidateUrls(
   const urlMap = new Map<string, UrlEntry[]>();
 
   for (const entry of urls) {
-    const normalized = normalizeUrl(entry.loc);
+    const normalized = normalizeUrl(entry.loc, normalization);
     if (!urlMap.has(normalized)) {
       urlMap.set(normalized, []);
     }
@@ -124,9 +332,11 @@ export function consolidateUrls(
 
   for (const [normalized, entries] of urlMap.entries()) {
     const merged = mergeUrlEntries(entries);
+    // Update the loc to use the normalized URL
+    merged.loc = normalized;
     uniqueUrls.push(merged);
 
-    if (entries.length > 1) {
+    if (trackDuplicates && entries.length > 1) {
       duplicateGroups.push({
         url: normalized,
         count: entries.length,
@@ -157,6 +367,6 @@ export function consolidateUrls(
     uniqueUrls,
     totalInputUrls,
     duplicatesRemoved: totalInputUrls - uniqueUrls.length,
-    duplicateGroups,
+    duplicateGroups: trackDuplicates ? duplicateGroups : undefined,
   };
 }
