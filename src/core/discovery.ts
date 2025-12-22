@@ -270,8 +270,9 @@ function extractSitemapIndexUrls(xmlContent: string): string[] {
 async function discoverAllSitemaps(
   initialSitemaps: string[],
   config: Config
-): Promise<string[]> {
+): Promise<{ sitemaps: string[]; issues: SitemapAccessIssue[] }> {
   const finalSitemaps: string[] = [];
+  const accessIssues: SitemapAccessIssue[] = [];
   const toProcess = [...initialSitemaps];
   const processed = new Set<string>();
   const inaccessible = new Set<string>();
@@ -321,6 +322,14 @@ async function discoverAllSitemaps(
       } catch (error) {
         inaccessible.add(sitemapUrl);
         
+        if (error instanceof HttpError && (error.statusCode === 401 || error.statusCode === 403)) {
+          accessIssues.push({
+            url: sitemapUrl,
+            statusCode: error.statusCode,
+            error: error.statusCode === 401 ? 'Unauthorized' : 'Access Denied'
+          });
+        }
+        
         if (config.verbose) {
           const message = error instanceof Error ? error.message : String(error);
           console.warn(`Failed to fetch sitemap ${sitemapUrl}: ${message}`);
@@ -350,11 +359,13 @@ async function discoverAllSitemaps(
   }
   
   if (finalSitemaps.length === 0 && inaccessible.size > 0) {
-    console.warn(`\n⚠️  All ${inaccessible.size} sitemap(s) were inaccessible`);
-    console.warn(`Common causes: 403/404 errors, network issues, or bot protection`);
+    if (config.verbose) {
+      console.warn(`\n⚠️  All ${inaccessible.size} sitemap(s) were inaccessible`);
+      console.warn(`Common causes: 403/404 errors, network issues, or bot protection`);
+    }
   }
   
-  return finalSitemaps;
+  return { sitemaps: finalSitemaps, issues: accessIssues };
 }
 
 /**
@@ -386,13 +397,11 @@ export async function discoverSitemaps(
   
   const robotsSitemaps = await parseRobotsTxt(normalizedUrl, config);
   if (robotsSitemaps.length > 0) {
-    const sitemaps = await discoverAllSitemaps(robotsSitemaps, config);
-    // Even if all sitemaps from robots.txt are inaccessible (resulting in an empty array),
-    // treat robots.txt as the authoritative source and do not fall back to standard paths.
+    const { sitemaps, issues } = await discoverAllSitemaps(robotsSitemaps, config);
     return {
       sitemaps,
       source: 'robots-txt',
-      accessIssues: []
+      accessIssues: issues
     };
   }
   
@@ -401,14 +410,14 @@ export async function discoverSitemaps(
     console.log('Trying standard sitemap paths...');
   }
   
-  const { sitemaps: standardSitemaps, issues } = await tryStandardPaths(normalizedUrl, config);
+  const { sitemaps: standardSitemaps, issues: standardIssues } = await tryStandardPaths(normalizedUrl, config);
   if (standardSitemaps.length > 0) {
-    const sitemaps = await discoverAllSitemaps(standardSitemaps, config);
+    const { sitemaps, issues } = await discoverAllSitemaps(standardSitemaps, config);
     if (sitemaps.length > 0) {
       return {
         sitemaps,
         source: 'standard-path',
-        accessIssues: []
+        accessIssues: issues
       };
     }
 
@@ -416,14 +425,24 @@ export async function discoverSitemaps(
     return {
       sitemaps: [],
       source: 'standard-path',
-      accessIssues: issues
+      accessIssues: issues.length > 0 ? issues : standardIssues
     };
   }
   
-  // No sitemaps found
+  // No sitemaps found. If all standard paths were blocked, report it as a single issue
+  // to avoid confusing the user with "6 sitemaps blocked" when we were just guessing.
+  let finalIssues = standardIssues;
+  if (standardIssues.length === 6 && standardIssues.every(i => i.statusCode === 403)) {
+    finalIssues = [{
+      url: `${normalizedUrl}/sitemap.xml (and others)`,
+      statusCode: 403,
+      error: 'Access Denied (Site likely blocking bots)'
+    }];
+  }
+
   return {
     sitemaps: [],
     source: 'none',
-    accessIssues: issues
+    accessIssues: finalIssues
   };
 }
