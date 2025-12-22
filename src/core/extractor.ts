@@ -45,7 +45,6 @@ export async function extractAllUrls(
         const response = await fetchUrl(sitemapUrl, {
           timeout: 10, // Fast timeout for sitemaps
           maxRetries: 0, // No retries - fail fast
-          disableBrowserFallback: true // Don't use browser for bulk parsing
         });
 
         // Parse sitemap XML
@@ -89,11 +88,15 @@ export async function extractAllUrls(
   for (const result of results) {
     if (result.success) {
       sitemapsProcessed++;
-      allUrls.push(...result.urls);
+      for (const url of result.urls) {
+        allUrls.push(url);
+      }
     } else {
       sitemapsFailed++;
     }
-    allErrors.push(...result.errors);
+    for (const error of result.errors) {
+      allErrors.push(error);
+    }
   }
 
   if (config.verbose) {

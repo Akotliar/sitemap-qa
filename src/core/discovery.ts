@@ -333,7 +333,9 @@ async function discoverAllSitemaps(
     // Process results atomically after all promises complete
     for (const result of batchResults) {
       if (result.type === 'index') {
-        toProcess.push(...result.childUrls);
+        for (const url of result.childUrls) {
+          toProcess.push(url);
+        }
       } else if (result.type === 'sitemap') {
         finalSitemaps.push(result.url);
       }

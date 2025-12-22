@@ -379,7 +379,11 @@ function mergeUrlEntries(entries: UrlEntry[]): UrlEntry {
     .filter((p): p is number => p !== undefined);
 
   if (priorities.length > 0) {
-    merged.priority = Math.max(...priorities);
+    let maxPriority = -Infinity;
+    for (const p of priorities) {
+      if (p > maxPriority) maxPriority = p;
+    }
+    merged.priority = maxPriority;
   }
 
   // Use most frequent changefreq (or first if tie)
