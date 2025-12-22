@@ -34,7 +34,8 @@
     "build": "tsup",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "perf-check": "tsx scripts/measure-performance.ts"
   },
   "keywords": [
     "sitemap",
@@ -51,8 +52,7 @@
     "commander": "^14.0.2",
     "dotenv": "^17.2.3",
     "fast-xml-parser": "^5.3.3",
-    "ora": "^9.0.0",
-    "playwright": "^1.57.0"
+    "ora": "^9.0.0"
   },
   "devDependencies": {
     "@types/cli-progress": "^3.11.6",

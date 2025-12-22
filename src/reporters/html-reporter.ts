@@ -5,7 +5,7 @@ import type { Config } from '@/types/config';
 
 // Version is injected at build time by tsup
 declare const __PACKAGE_VERSION__: string;
-const TOOL_VERSION = __PACKAGE_VERSION__;
+const TOOL_VERSION = typeof __PACKAGE_VERSION__ !== 'undefined' ? __PACKAGE_VERSION__ : '1.0.0';
 
 export interface HtmlReporterOptions {
   maxUrlsPerGroup?: number; // Max sample URLs to display (default: 10)
