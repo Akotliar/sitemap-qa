@@ -2,6 +2,7 @@
 import 'dotenv/config';
 import { Command } from 'commander';
 import { analyzeCommand } from '@/commands/analyze';
+import { initCommand } from '@/commands/init';
 
 const program = new Command();
 
@@ -11,6 +12,7 @@ program
   .description('sitemap analysis for QA teams');
 
 program.addCommand(analyzeCommand);
+program.addCommand(initCommand);
 
 // Global error handler
 process.on('unhandledRejection', (reason, promise) => {

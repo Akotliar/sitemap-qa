@@ -1,15 +1,4 @@
-import fs from 'node:fs/promises';
-import { Reporter, ReportData } from './base';
 
-export class HtmlReporter implements Reporter {
-  private readonly outputPath: string;
-
-  constructor(outputPath: string = 'sitemap-qa-report.html') {
-    this.outputPath = outputPath;
-  }
-
-  async generate(data: ReportData): Promise<void> {
-    const html = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -35,10 +24,10 @@ export class HtmlReporter implements Reporter {
 <body>
     <h1>sitemap-qa Analysis Report</h1>
     <div class="summary">
-        <div class="card"><h3>Total URLs</h3><p>${data.totalUrls}</p></div>
-        <div class="card risk"><h3>Total Risks</h3><p>${data.totalRisks}</p></div>
-        <div class="card"><h3>URLs with Risks</h3><p>${data.urlsWithRisks.length}</p></div>
-        <div class="card"><h3>Duration</h3><p>${((data.endTime.getTime() - data.startTime.getTime()) / 1000).toFixed(2)}s</p></div>
+        <div class="card"><h3>Total URLs</h3><p>412</p></div>
+        <div class="card risk"><h3>Total Risks</h3><p>1</p></div>
+        <div class="card"><h3>URLs with Risks</h3><p>1</p></div>
+        <div class="card"><h3>Duration</h3><p>1.30s</p></div>
     </div>
 
     <h2>Detected Risks</h2>
@@ -50,26 +39,20 @@ export class HtmlReporter implements Reporter {
             </tr>
         </thead>
         <tbody>
-            ${data.urlsWithRisks.map(url => `
+            
             <tr>
-                <td><a href="${url.loc}" target="_blank">${url.loc}</a></td>
+                <td><a href="https://www.applydigital.com/test-and-unused-pages/test-article/" target="_blank">https://www.applydigital.com/test-and-unused-pages/test-article/</a></td>
                 <td>
-                    ${url.risks.map(risk => `
+                    
                     <div>
-                        <span class="risk-tag">${risk.category}</span>
-                        <span class="reason">${risk.reason}</span>
+                        <span class="risk-tag">Test Content</span>
+                        <span class="reason">Test Content that should not be indexed</span>
                     </div>
-                    `).join('')}
+                    
                 </td>
             </tr>
-            `).join('')}
+            
         </tbody>
     </table>
 </body>
 </html>
-`;
-
-    await fs.writeFile(this.outputPath, html, 'utf8');
-    console.log(`HTML report generated at ${this.outputPath}`);
-  }
-}

@@ -1,0 +1,26 @@
+{
+  "metadata": {
+    "generatedAt": "2025-12-24T19:52:41.200Z",
+    "durationMs": 1296
+  },
+  "summary": {
+    "totalUrls": 412,
+    "totalRisks": 1,
+    "urlsWithRisksCount": 1
+  },
+  "findings": [
+    {
+      "loc": "https://www.applydigital.com/test-and-unused-pages/test-article/",
+      "source": "https://www.applydigital.com/sitemap.xml",
+      "lastmod": "2025-12-16T19:29:26.491Z",
+      "risks": [
+        {
+          "category": "Test Content",
+          "pattern": "test**",
+          "type": "glob",
+          "reason": "Test Content that should not be indexed"
+        }
+      ]
+    }
+  ]
+}
