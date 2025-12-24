@@ -1,151 +1,50 @@
-import { XMLParser, XMLValidator } from 'fast-xml-parser';
+import { XMLParser } from 'fast-xml-parser';
+import { fetch } from 'undici';
+import { SitemapUrl } from '../types/sitemap';
 
-// Module-level constants for performance optimization
-const VALID_CHANGEFREQ = new Set([
-  'always',
-  'hourly',
-  'daily',
-  'weekly',
-  'monthly',
-  'yearly',
-  'never',
-]);
+export class SitemapParser {
+  private readonly parser: XMLParser;
 
-export interface UrlEntry {
-  loc: string; // Required: URL location
-  lastmod?: string; // Optional: Last modification date
-  changefreq?: string; // Optional: Change frequency
-  priority?: number; // Optional: Priority (0.0-1.0)
-  source: string; // Which sitemap this came from
-  extractedAt?: string; // ISO timestamp of extraction
-}
-
-export interface ParseResult {
-  urls: UrlEntry[]; // Successfully parsed URLs
-  errors: string[]; // Parsing errors/warnings
-  totalCount: number; // Total URLs parsed
-  sitemapUrl: string; // Source sitemap URL
-}
-
-const parser = new XMLParser({
-  ignoreAttributes: false,
-  attributeNamePrefix: '@_',
-  textNodeName: '_text',
-  parseAttributeValue: true,
-  trimValues: true,
-  allowBooleanAttributes: true,
-  parseTagValue: false, // Keep values as strings for validation
-});
-
-function extractUrls(parsedXml: any, sitemapUrl: string): UrlEntry[] {
-  const urls: UrlEntry[] = [];
-
-  // Handle urlset format
-  if (parsedXml.urlset) {
-    // Normalize to array (single <url> vs multiple)
-    const urlNodes = Array.isArray(parsedXml.urlset.url)
-      ? parsedXml.urlset.url
-      : [parsedXml.urlset.url];
-
-    // Use traditional for-loop for better performance
-    for (let i = 0; i < urlNodes.length; i++) {
-      const node = urlNodes[i];
-      // Skip entries without loc field
-      if (!node || !node.loc) {
-        continue;
-      }
-
-      urls.push({
-        loc: node.loc,
-        lastmod: node.lastmod,
-        changefreq: node.changefreq,
-        priority: node.priority ? parseFloat(node.priority) : undefined,
-        source: sitemapUrl,
-      });
-    }
+  constructor() {
+    this.parser = new XMLParser({
+      ignoreAttributes: false,
+      attributeNamePrefix: "@_",
+    });
   }
 
-  return urls;
-}
+  /**
+   * Parses a leaf sitemap and yields SitemapUrl objects.
+   * Note: For true streaming of massive files, we'd use a SAX-like approach.
+   * fast-xml-parser's parse() is fast but loads the whole string.
+   * Given the 50k URL requirement, we'll use a more memory-efficient approach if needed,
+   * but let's start with a clean AsyncGenerator interface.
+   */
+  async *parse(sitemapUrl: string): AsyncGenerator<SitemapUrl> {
+    try {
+      const response = await fetch(sitemapUrl);
+      const xmlData = await response.text();
+      const jsonObj = this.parser.parse(xmlData);
 
-export async function parseSitemap(
-  xml: string,
-  sitemapUrl: string
-): Promise<ParseResult> {
-  const errors: string[] = [];
+      if (jsonObj.urlset && jsonObj.urlset.url) {
+        const urls = Array.isArray(jsonObj.urlset.url)
+          ? jsonObj.urlset.url
+          : [jsonObj.urlset.url];
 
-  try {
-    // Validate XML first
-    const validationResult = XMLValidator.validate(xml);
-    if (validationResult !== true) {
-      const validationError = typeof validationResult === 'object'
-        ? validationResult.err.msg
-        : 'Invalid XML';
-      return {
-        urls: [],
-        errors: [
-          `[${sitemapUrl}] XML parsing failed: ${validationError}`,
-        ],
-        totalCount: 0,
-        sitemapUrl,
-      };
-    }
-
-    // Parse XML
-    const parsed = parser.parse(xml);
-
-    // Extract URLs
-    const urls = extractUrls(parsed, sitemapUrl);
-
-    // Validate extracted URLs
-    const validUrls: UrlEntry[] = [];
-    for (const entry of urls) {
-      try {
-        // Validate URL format
-        new URL(entry.loc);
-
-        // Validate priority range
-        if (entry.priority !== undefined) {
-          if (entry.priority < 0 || entry.priority > 1) {
-            errors.push(
-              `Invalid priority ${entry.priority} for ${entry.loc} - clamping to 0-1`
-            );
-            entry.priority = Math.max(0, Math.min(1, entry.priority));
+        for (const url of urls) {
+          if (url.loc) {
+            yield {
+              loc: url.loc,
+              source: sitemapUrl,
+              lastmod: url.lastmod,
+              changefreq: url.changefreq,
+              priority: url.priority,
+              risks: [],
+            };
           }
         }
-
-        // Validate changefreq (using Set for O(1) lookup)
-        if (entry.changefreq) {
-          if (!VALID_CHANGEFREQ.has(entry.changefreq.toLowerCase())) {
-            errors.push(
-              `Invalid changefreq "${entry.changefreq}" for ${entry.loc}`
-            );
-            entry.changefreq = undefined;
-          }
-        }
-
-        validUrls.push(entry);
-      } catch (urlError) {
-        errors.push(`Invalid URL format: ${entry.loc}`);
       }
+    } catch (error) {
+      console.error(`Failed to parse sitemap at ${sitemapUrl}:`, error);
     }
-
-    return {
-      urls: validUrls,
-      errors,
-      totalCount: validUrls.length,
-      sitemapUrl,
-    };
-  } catch (parseError) {
-    // XML parsing failed completely
-    const errorMsg = parseError instanceof Error ? parseError.message : String(parseError);
-    return {
-      urls: [],
-      errors: [
-        `[${sitemapUrl}] XML parsing failed: ${errorMsg}`,
-      ],
-      totalCount: 0,
-      sitemapUrl,
-    };
   }
 }

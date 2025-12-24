@@ -1,117 +1,67 @@
-import { Config } from '@/types/config';
-import { UrlEntry, parseSitemap } from '@/core/parser';
-import { fetchUrl } from '@/utils/http-client';
-import { processInBatches } from '@/utils/batch-processor';
+import { DiscoveryService } from './discovery';
+import { SitemapParser } from './parser';
+import { SitemapUrl } from '../types/sitemap';
 
-export interface ExtractionResult {
-  allUrls: UrlEntry[]; // All URLs from all sitemaps
-  sitemapsProcessed: number; // Number of sitemaps successfully parsed
-  sitemapsFailed: number; // Number of sitemaps that failed
-  totalUrls: number; // Total URLs extracted
-  errors: string[]; // All errors collected
-}
+export class ExtractorService {
+  private readonly discovery: DiscoveryService;
+  private readonly parser: SitemapParser;
+  private readonly seenUrls = new Set<string>();
+  private readonly discoveredSitemaps = new Set<string>();
 
-export async function extractAllUrls(
-  sitemapUrls: string[],
-  config: Config,
-  onProgress?: (completed: number, total: number) => void
-): Promise<ExtractionResult> {
-  const allUrls: UrlEntry[] = [];
-  const allErrors: string[] = [];
-  let sitemapsProcessed = 0;
-  let sitemapsFailed = 0;
-
-  if (config.verbose) {
-    console.log(`\nExtracting URLs from ${sitemapUrls.length} sitemap(s)...`);
+  constructor() {
+    this.discovery = new DiscoveryService();
+    this.parser = new SitemapParser();
   }
 
-  // Process sitemaps in parallel with configurable concurrency
-  const CONCURRENCY = config.parsingConcurrency || 50;  // Optimized for network-bound I/O
-  
-  if (!config.silent && config.verbose) {
-    console.log(`Using parsing concurrency: ${CONCURRENCY}`);
+  /**
+   * Returns the list of sitemaps discovered during the extraction process.
+   */
+  getDiscoveredSitemaps(): string[] {
+    return Array.from(this.discoveredSitemaps);
   }
-  
-  const results = await processInBatches(
-    sitemapUrls, 
-    CONCURRENCY, 
-    async (sitemapUrl) => {
-      try {
-        if (config.verbose) {
-          console.log(`Extracting URLs from: ${sitemapUrl}`);
-        }
 
-        // Fetch sitemap content
-        const response = await fetchUrl(sitemapUrl, {
-          timeout: 10, // Fast timeout for sitemaps
-          maxRetries: 0, // No retries - fail fast
-        });
-
-        // Parse sitemap XML
-        const parseResult = await parseSitemap(response.content, sitemapUrl);
-
-        // Add extraction timestamp to each URL (optimized: single timestamp for batch)
-        const extractedAt = new Date().toISOString();
-        parseResult.urls.forEach(url => {
-          url.extractedAt = extractedAt;
-        });
-
-        if (config.verbose) {
-          console.log(`  ✓ Extracted ${parseResult.urls.length} URLs from ${sitemapUrl}`);
-        }
-
-        return {
-          success: true,
-          urls: parseResult.urls,
-          errors: parseResult.errors,
-        };
-      } catch (error) {
-        const errorMsg = `Failed to process ${sitemapUrl}: ${
-          error instanceof Error ? error.message : String(error)
-        }`;
-
-        if (config.verbose) {
-          console.error(`  ✗ ${errorMsg}`);
-        }
-
-        return {
-          success: false,
-          urls: [],
-          errors: [errorMsg],
-        };
-      }
-    },
-    onProgress  // Pass progress callback to batch processor
-  );
-
-  // Aggregate results
-  for (const result of results) {
-    if (result.success) {
-      sitemapsProcessed++;
-      for (const url of result.urls) {
-        allUrls.push(url);
-      }
-    } else {
-      sitemapsFailed++;
-    }
-    for (const error of result.errors) {
-      allErrors.push(error);
+  /**
+   * Normalizes a URL by removing trailing slashes and converting to lowercase.
+   */
+  private normalizeUrl(url: string): string {
+    try {
+      const parsed = new URL(url);
+      let normalized = parsed.origin + parsed.pathname.replace(/\/$/, '');
+      if (parsed.search) normalized += parsed.search;
+      return normalized.toLowerCase();
+    } catch {
+      return url.toLowerCase().replace(/\/$/, '');
     }
   }
 
-  if (config.verbose) {
-    console.log(`\nExtraction complete:`);
-    console.log(`  - Sitemaps processed: ${sitemapsProcessed}`);
-    console.log(`  - Sitemaps failed: ${sitemapsFailed}`);
-    console.log(`  - Total URLs: ${allUrls.length}`);
-    console.log(`  - Errors: ${allErrors.length}`);
-  }
+  /**
+   * Extracts all unique URLs from a root sitemap URL or website base URL.
+   */
+  async *extract(inputUrl: string): AsyncGenerator<SitemapUrl> {
+    let startUrls = [inputUrl];
 
-  return {
-    allUrls,
-    sitemapsProcessed,
-    sitemapsFailed,
-    totalUrls: allUrls.length,
-    errors: allErrors,
-  };
+    // If the URL doesn't end in .xml or .gz, it might be a website root
+    if (!inputUrl.endsWith('.xml') && !inputUrl.endsWith('.gz')) {
+      const discovered = await this.discovery.findSitemaps(inputUrl);
+      if (discovered.length > 0) {
+        console.log(`✅ Discovered ${discovered.length} sitemap(s): ${discovered.join(', ')}`);
+        startUrls = discovered;
+      } else {
+        console.log(`⚠️ No sitemaps discovered via robots.txt or standard paths. Proceeding with input URL.`);
+      }
+    }
+
+    for (const startUrl of startUrls) {
+      for await (const sitemapUrl of this.discovery.discover(startUrl)) {
+        this.discoveredSitemaps.add(sitemapUrl);
+        for await (const urlObj of this.parser.parse(sitemapUrl)) {
+          const normalized = this.normalizeUrl(urlObj.loc);
+          if (!this.seenUrls.has(normalized)) {
+            this.seenUrls.add(normalized);
+            yield urlObj;
+          }
+        }
+      }
+    }
+  }
 }
