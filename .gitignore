@@ -47,3 +47,7 @@ sitemap-qa/
 #bmad method agents
 .bmad
 docs/
+
+sitemap-qa-report.html
+sitemap-qa-report.json
+sitemap-qa.yaml
