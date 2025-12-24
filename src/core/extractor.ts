@@ -6,10 +6,18 @@ export class ExtractorService {
   private readonly discovery: DiscoveryService;
   private readonly parser: SitemapParser;
   private readonly seenUrls = new Set<string>();
+  private readonly discoveredSitemaps = new Set<string>();
 
   constructor() {
     this.discovery = new DiscoveryService();
     this.parser = new SitemapParser();
+  }
+
+  /**
+   * Returns the list of sitemaps discovered during the extraction process.
+   */
+  getDiscoveredSitemaps(): string[] {
+    return Array.from(this.discoveredSitemaps);
   }
 
   /**
@@ -45,6 +53,7 @@ export class ExtractorService {
 
     for (const startUrl of startUrls) {
       for await (const sitemapUrl of this.discovery.discover(startUrl)) {
+        this.discoveredSitemaps.add(sitemapUrl);
         for await (const urlObj of this.parser.parse(sitemapUrl)) {
           const normalized = this.normalizeUrl(urlObj.loc);
           if (!this.seenUrls.has(normalized)) {

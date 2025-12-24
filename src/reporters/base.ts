@@ -1,6 +1,8 @@
 import { SitemapUrl } from '../types/sitemap';
 
 export interface ReportData {
+  rootUrl: string;
+  discoveredSitemaps: string[];
   totalUrls: number;
   totalRisks: number;
   urlsWithRisks: SitemapUrl[];

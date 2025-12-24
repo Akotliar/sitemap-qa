@@ -28,7 +28,7 @@ export const analyzeCommand = new Command('analyze')
     let totalUrls = 0;
     let totalRisks = 0;
 
-    console.log(chalk.blue(`\níº€ Starting analysis of ${url}...`));
+    console.log(chalk.blue(`\nï¿½ï¿½ï¿½ Starting analysis of ${url}...`));
 
     try {
       // 3. Pipeline: Extract -> Match
@@ -50,6 +50,8 @@ export const analyzeCommand = new Command('analyze')
 
       const endTime = new Date();
       const reportData: ReportData = {
+        rootUrl: url,
+        discoveredSitemaps: extractor.getDiscoveredSitemaps(),
         totalUrls,
         totalRisks,
         urlsWithRisks,
