@@ -1,5 +1,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
+import path from 'node:path';
+import fs from 'node:fs/promises';
 import { ConfigLoader } from '../config/loader';
 import { ExtractorService } from '../core/extractor';
 import { MatcherService } from '../core/matcher';
@@ -14,11 +16,13 @@ export const analyzeCommand = new Command('analyze')
   .argument('<url>', 'Root sitemap URL')
   .option('-c, --config <path>', 'Path to sitemap-qa.yaml')
   .option('-o, --output <format>', 'Output format (json, html, all)', 'all')
-  .action(async (url: string, options: { config?: string; output: string }) => {
+  .option('-d, --out-dir <path>', 'Directory to save reports')
+  .action(async (url: string, options: { config?: string; output: string; outDir?: string }) => {
     const startTime = new Date();
     
     // 1. Load Config
     const config = ConfigLoader.load(options.config);
+    const outDir = options.outDir || config.outDir || '.';
     
     // 2. Initialize Services
     const extractor = new ExtractorService();
@@ -62,11 +66,17 @@ export const analyzeCommand = new Command('analyze')
       // 4. Reporting
       const reporters: Reporter[] = [new ConsoleReporter()];
       
+      if (outDir !== '.') {
+        await fs.mkdir(outDir, { recursive: true });
+      }
+
       if (options.output === 'json' || options.output === 'all') {
-        reporters.push(new JsonReporter());
+        const jsonPath = path.join(outDir, 'sitemap-qa-report.json');
+        reporters.push(new JsonReporter(jsonPath));
       }
       if (options.output === 'html' || options.output === 'all') {
-        reporters.push(new HtmlReporter());
+        const htmlPath = path.join(outDir, 'sitemap-qa-report.html');
+        reporters.push(new HtmlReporter(htmlPath));
       }
 
       for (const reporter of reporters) {

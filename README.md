@@ -161,58 +161,59 @@ sitemap-qa analyze https://example.com --verbose
 
 ## 🔧 Configuration
 
-Create a `.sitemap-qa.config.json` file in your project root or `~/.sitemap-qa/config.json` for global settings:
+Create a `sitemap-qa.yaml` file in your project root to define your monitoring policies and tool settings:
 
-```json
-{
-  "timeout": 30,
-  "concurrency": 10,
-  "outputFormat": "html",
-  "outputDir": "./sitemap-qa/report",
-  "verbose": false,
-  "acceptedPatterns": [
-    "test-*",
-    "staging-*"
-  ]
-}
+```yaml
+# Tool Settings
+outDir: "./sitemap-qa/report"
+
+# Monitoring Policies
+policies:
+  - category: "Security & Admin"
+    patterns:
+      - type: "glob"
+        value: "**/admin/**"
+        reason: "Administrative interfaces should not be publicly indexed."
+      - type: "literal"
+        value: "/wp-admin"
+        reason: "WordPress admin paths are common attack vectors."
+      - type: "regex"
+        value: ".*\\.php$"
+        reason: "PHP file detected"
 ```
 
 ### Configuration Options
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `timeout` | number | `30` | HTTP request timeout in seconds (1-300) |
-| `concurrency` | number | `10` | Number of concurrent HTTP requests |
-| `parsingConcurrency` | number | `50` | Number of concurrent sitemap parsers |
-| `discoveryConcurrency` | number | `50` | Number of concurrent sitemap index fetches |
-| `maxSitemaps` | number | `1000` | Maximum number of sitemaps to process |
-| `outputFormat` | string | `"html"` | Output format: `"html"` or `"json"` |
-| `outputDir` | string | `"./sitemap-qa/report"` | Directory for generated reports |
-| `verbose` | boolean | `false` | Enable detailed logging |
-| `acceptedPatterns` | string[] | `[]` | URL patterns to exclude from risk detection |
+| `outDir` | string | `"./sitemap-qa/report"` | Directory for generated reports |
+| `policies` | array | `[]` | List of monitoring policies with patterns |
 
-### Accepted Patterns
+### Policy Patterns
 
-Exclude specific URLs from risk detection using wildcard patterns:
+Define patterns to detect risks in your sitemaps:
 
-```json
-{
-  "acceptedPatterns": [
-    "testing-*",                 // Matches: test-player, test-player-stats
-    "https://example.com/admin/*",  // Matches: any URL under /admin/
-    "/special-case"                 // Matches: exact path segment
-  ]
-}
+```yaml
+policies:
+  - category: "Custom Rules"
+    patterns:
+      - type: "literal"
+        value: "test"
+        reason: "Test URL found"
+      - type: "glob"
+        value: "**/internal/*"
+        reason: "Internal path exposed"
+      - type: "regex"
+        value: "api/v[0-9]/"
+        reason: "API versioning detected"
 ```
 
-**Pattern Syntax:**
-- Use `*` as a wildcard (matches any characters within a path segment)
-- Patterns are case-insensitive
-- Special characters are automatically escaped
-- Patterns match against the full URL
-- Full URLs or path fragments both work
+**Rule Types:**
+- `literal`: Exact string match
+- `glob`: Wildcard patterns (e.g., `**/admin/**`)
+- `regex`: Regular expression matching
 
-**Priority:** CLI options > Project config (`.sitemap-qa.config.json`) > Global config (`~/.sitemap-qa/config.json`) > Defaults
+**Priority:** CLI options > Project config (`sitemap-qa.yaml`) > Defaults
 
 ## 📝 License
 
