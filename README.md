@@ -55,61 +55,66 @@ sitemap-qa analyze https://example.com --verbose
 - Checks `robots.txt` for sitemap declarations
 - Tests standard paths (`/sitemap.xml`, `/sitemap_index.xml`, etc.)
 - Recursively follows sitemap indexes
-- Handles multiple sitemaps and formats
-- Detects and processes malformed sitemap indexes (sitemaps listed in `<url>` blocks instead of `<sitemap>` blocks)
+- Handles multiple sitemaps and compressed formats (`.xml.gz`)
 
 ### Risk Detection Patterns
 
-| Risk Category | Severity | Examples | Can Be Excluded |
-|--------------|----------|----------|-----------------|
-| **Environment Leakage** | High | `staging.example.com`, `/dev/`, `/test/` | ✅ Via patterns |
-| **Admin Paths** | High | `/admin`, `/dashboard`, `/config`, `/console` | ✅ Via patterns |
-| **Internal Content** | Medium | `/internal` paths | ✅ Via patterns |
-| **Sensitive Parameters** | High | `?token=`, `?apikey=`, `?password=` | ✅ Via patterns |
-| **Test Content** | Medium | `/test-`, `sample-`, `demo-` | ✅ Via patterns |
-| **Protocol Inconsistency** | Medium | HTTP URLs in HTTPS sitemaps | ❌ Always detected |
-| **Domain Mismatch** | Medium | Different domains in sitemap | ❌ Always detected |
+The tool comes with a set of default policies, but you can fully customize them in your `sitemap-qa.yaml`.
+
+| Risk Category | Description | Default Patterns |
+|--------------|-------------|------------------|
+| **Security & Admin** | Detects exposed administrative interfaces and sensitive configuration files. | `**/admin/**`, `**/.env*`, `/wp-admin` |
+| **Environment Leakage** | Finds staging or development URLs that shouldn't be in production sitemaps. | `**/staging.**`, `**/dev.**` |
+| **Sensitive Files** | Flags database backups, archives, and other sensitive file types. | `**/*.{sql,bak,zip,tar.gz}` |
+
+### Customizing Risks
+
+You can add your own categories and patterns to the `sitemap-qa.yaml` file. Patterns support `literal`, `glob`, and `regex` matching.
+
+```yaml
+policies:
+  - category: "Internal API"
+    patterns:
+      - type: "glob"
+        value: "**/api/v1/internal/**"
+        reason: "Internal API version 1 should not be exposed."
+```
 
 
 ### Output Formats
 
 #### HTML Report (Interactive)
 The HTML report provides an interactive, visually appealing view with:
-- Expandable/collapsible sections by severity
-- Download buttons to export all URLs per category
+- Expandable/collapsible sections by category
+- Download buttons to export all URLs per finding
 - Clean, modern design with hover effects
 - Portable single-file format
 
 #### JSON Report (Machine-Readable)
 ```json
 {
-  "analysis_metadata": {
-    "base_url": "https://example.com",
-    "tool_version": "1.0.0",
-    "analysis_type": "rule-based analysis",
-    "analysis_timestamp": "2025-12-11T00:00:00.000Z",
-    "execution_time_ms": 4523
+  "metadata": {
+    "generatedAt": "2025-12-24T12:00:00.000Z",
+    "durationMs": 1240
   },
-  "sitemaps_discovered": [
-    "https://example.com/sitemap.xml"
-  ],
-  "suspicious_groups": [
-    {
-      "category": "environment_leakage",
-      "severity": "high",
-      "count": 3,
-      "rationale": "Production sitemap contains staging URLs",
-      "sample_urls": ["..."],
-      "recommended_action": "Verify sitemap generation excludes non-production environments"
-    }
-  ],
   "summary": {
-    "high_severity_count": 2,
-    "medium_severity_count": 1,
-    "low_severity_count": 0,
-    "total_risky_urls": 8,
-    "overall_status": "issues_found"
-  }
+    "totalUrls": 895,
+    "totalRisks": 2,
+    "urlsWithRisksCount": 1
+  },
+  "findings": [
+    {
+      "loc": "https://example.com/admin/login",
+      "risks": [
+        {
+          "category": "Security & Admin",
+          "pattern": "**/admin/**",
+          "type": "glob",
+          "reason": "Administrative interfaces should not be publicly indexed."
+        }
+      ]
+    }
+  ]
 }
 ```
 
@@ -126,35 +131,26 @@ Arguments:
   url                          Base URL of the website to analyze
 
 Options:
-  --timeout <seconds>          HTTP request timeout in seconds (default: 30)
-  --output <format>            Output format: html or json (default: "html")
-  --output-dir <path>          Output directory for reports (default: "./sitemap-qa/report")
-  --output-file <path>         Custom output filename
-  --accepted-patterns <list>   Comma-separated patterns to exclude from risk detection
-  --verbose                    Enable verbose logging
+  -c, --config <path>          Path to sitemap-qa.yaml
+  -o, --output <format>        Output format: json, html, or all (default: "all")
+  -d, --out-dir <path>         Output directory for reports (default: "./sitemap-qa/report")
   -h, --help                   Display help for command
 ```
 
 ### Examples
 
 ```bash
-# Basic analysis with HTML report (default)
+# Basic analysis with both HTML and JSON reports (default)
 sitemap-qa analyze https://example.com
 
-# JSON output for CI/CD integration
+# JSON output only
 sitemap-qa analyze https://example.com --output json
 
 # Custom output directory
-sitemap-qa analyze https://example.com --output-dir ./reports
+sitemap-qa analyze https://example.com --out-dir ./reports
 
-# Exclude specific URL patterns from detection
-sitemap-qa analyze https://example.com --accepted-patterns "internal-*,test-*"
-
-# Increase timeout for slow servers
-sitemap-qa analyze https://example.com --timeout 60
-
-# Verbose mode for debugging
-sitemap-qa analyze https://example.com --verbose
+# Use a specific configuration file
+sitemap-qa analyze https://example.com --config ./custom-config.yaml
 ```
 
 ---
@@ -166,6 +162,7 @@ Create a `sitemap-qa.yaml` file in your project root to define your monitoring p
 ```yaml
 # Tool Settings
 outDir: "./sitemap-qa/report"
+outputFormat: "all" # Options: json, html, all
 
 # Monitoring Policies
 policies:
@@ -187,6 +184,7 @@ policies:
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `outDir` | string | `"./sitemap-qa/report"` | Directory for generated reports |
+| `outputFormat` | string | `"all"` | Report types to generate: `json`, `html`, or `all` |
 | `policies` | array | `[]` | List of monitoring policies with patterns |
 
 ### Policy Patterns
@@ -226,6 +224,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 Built with:
 - [Commander.js](https://github.com/tj/commander.js) - CLI framework
 - [Chalk](https://github.com/chalk/chalk) - Terminal styling
+- [Undici](https://github.com/nodejs/undici) - High-performance HTTP client
+- [Fast-XML-Parser](https://github.com/NaturalIntelligence/fast-xml-parser) - Fast XML parsing
+- [Zod](https://zod.dev/) - Schema validation
+- [Micromatch](https://github.com/micromatch/micromatch) - Glob pattern matching
 - [Vitest](https://vitest.dev/) - Testing framework
 - [TypeScript](https://www.typescriptlang.org/) - Type safety
 

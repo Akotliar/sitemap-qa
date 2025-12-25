@@ -9,7 +9,6 @@ export class DiscoveryService {
     '/sitemap_index.xml',
     '/sitemap-index.xml',
     '/sitemap.php',
-    '/sitemap.txt',
     '/sitemap.xml.gz'
   ];
 
