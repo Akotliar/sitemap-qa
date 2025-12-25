@@ -15,14 +15,15 @@ export const analyzeCommand = new Command('analyze')
   .description('Analyze a sitemap for potential risks')
   .argument('<url>', 'Root sitemap URL')
   .option('-c, --config <path>', 'Path to sitemap-qa.yaml')
-  .option('-o, --output <format>', 'Output format (json, html, all)', 'all')
+  .option('-o, --output <format>', 'Output format (json, html, all)')
   .option('-d, --out-dir <path>', 'Directory to save reports')
-  .action(async (url: string, options: { config?: string; output: string; outDir?: string }) => {
+  .action(async (url: string, options: { config?: string; output?: string; outDir?: string }) => {
     const startTime = new Date();
     
     // 1. Load Config
     const config = ConfigLoader.load(options.config);
     const outDir = options.outDir || config.outDir || '.';
+    const outputFormat = options.output || config.outputFormat || 'all';
     
     // 2. Initialize Services
     const extractor = new ExtractorService();
@@ -70,11 +71,11 @@ export const analyzeCommand = new Command('analyze')
         await fs.mkdir(outDir, { recursive: true });
       }
 
-      if (options.output === 'json' || options.output === 'all') {
+      if (outputFormat === 'json' || outputFormat === 'all') {
         const jsonPath = path.join(outDir, 'sitemap-qa-report.json');
         reporters.push(new JsonReporter(jsonPath));
       }
-      if (options.output === 'html' || options.output === 'all') {
+      if (outputFormat === 'html' || outputFormat === 'all') {
         const htmlPath = path.join(outDir, 'sitemap-qa-report.html');
         reporters.push(new HtmlReporter(htmlPath));
       }

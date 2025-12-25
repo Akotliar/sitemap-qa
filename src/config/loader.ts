@@ -57,7 +57,8 @@ export class ConfigLoader {
 
     return { 
       policies: mergedPolicies,
-      outDir: user.outDir || defaults.outDir
+      outDir: user.outDir || defaults.outDir,
+      outputFormat: user.outputFormat || defaults.outputFormat
     };
   }
 }
