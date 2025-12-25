@@ -67,9 +67,7 @@ export const analyzeCommand = new Command('analyze')
       // 4. Reporting
       const reporters: Reporter[] = [new ConsoleReporter()];
       
-      if (outDir !== '.') {
-        await fs.mkdir(outDir, { recursive: true });
-      }
+      await fs.mkdir(outDir, { recursive: true });
 
       if (outputFormat === 'json' || outputFormat === 'all') {
         const jsonPath = path.join(outDir, 'sitemap-qa-report.json');
