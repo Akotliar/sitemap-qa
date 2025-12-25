@@ -161,7 +161,8 @@ Create a `sitemap-qa.yaml` file in your project root to define your monitoring p
 
 ```yaml
 # Tool Settings
-outDir: "./sitemap-qa/report"
+# Default outDir is "."; this example uses a custom reports directory
+outDir: "./sitemap-qa/report" # custom output directory
 outputFormat: "all" # Options: json, html, all
 
 # Monitoring Policies
