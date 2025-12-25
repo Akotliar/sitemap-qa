@@ -209,7 +209,8 @@ policies:
 **Rule Types:**
 - `literal`: Exact string match
 - `glob`: Wildcard patterns (e.g., `**/admin/**`)
-- `regex`: Regular expression matching
+- `regex`: Regular expression matching (patterns are YAML strings and must use proper escaping)
+  - When defining regex patterns in `sitemap-qa.yaml`, remember they are YAML strings, so you must escape backslashes (for example, `".*\\\\.php$"` in YAML corresponds to the regex `.*\.php$`).
 
 **Priority:** CLI options > Project config (`sitemap-qa.yaml`) > Defaults
 
