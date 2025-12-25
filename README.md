@@ -184,10 +184,11 @@ policies:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `outDir` | string | `"./sitemap-qa/report"` | Directory for generated reports |
+| `outDir` | string | `"."` | Directory for generated reports (current working directory by default) |
 | `outputFormat` | string | `"all"` | Report types to generate: `json`, `html`, or `all` |
 | `policies` | array | `[]` | List of monitoring policies with patterns |
 
+> Note: The earlier `sitemap-qa.yaml` example sets `outDir: "./sitemap-qa/report"` as a recommended path. If you omit `outDir`, the default is `"."` (the current working directory).
 ### Policy Patterns
 
 Define patterns to detect risks in your sitemaps:
