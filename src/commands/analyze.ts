@@ -1,5 +1,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
+import path from 'node:path';
+import fs from 'node:fs/promises';
 import { ConfigLoader } from '../config/loader';
 import { ExtractorService } from '../core/extractor';
 import { MatcherService } from '../core/matcher';
@@ -13,12 +15,15 @@ export const analyzeCommand = new Command('analyze')
   .description('Analyze a sitemap for potential risks')
   .argument('<url>', 'Root sitemap URL')
   .option('-c, --config <path>', 'Path to sitemap-qa.yaml')
-  .option('-o, --output <format>', 'Output format (json, html, all)', 'all')
-  .action(async (url: string, options: { config?: string; output: string }) => {
+  .option('-o, --output <format>', 'Output format (json, html, all)')
+  .option('-d, --out-dir <path>', 'Directory to save reports')
+  .action(async (url: string, options: { config?: string; output?: string; outDir?: string }) => {
     const startTime = new Date();
     
     // 1. Load Config
     const config = ConfigLoader.load(options.config);
+    const outDir = options.outDir || config.outDir || '.';
+    const outputFormat = options.output || config.outputFormat || 'all';
     
     // 2. Initialize Services
     const extractor = new ExtractorService();
@@ -62,11 +67,15 @@ export const analyzeCommand = new Command('analyze')
       // 4. Reporting
       const reporters: Reporter[] = [new ConsoleReporter()];
       
-      if (options.output === 'json' || options.output === 'all') {
-        reporters.push(new JsonReporter());
+      await fs.mkdir(outDir, { recursive: true });
+
+      if (outputFormat === 'json' || outputFormat === 'all') {
+        const jsonPath = path.join(outDir, 'sitemap-qa-report.json');
+        reporters.push(new JsonReporter(jsonPath));
       }
-      if (options.output === 'html' || options.output === 'all') {
-        reporters.push(new HtmlReporter());
+      if (outputFormat === 'html' || outputFormat === 'all') {
+        const htmlPath = path.join(outDir, 'sitemap-qa-report.html');
+        reporters.push(new HtmlReporter(htmlPath));
       }
 
       for (const reporter of reporters) {

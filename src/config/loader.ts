@@ -12,6 +12,7 @@ export class ConfigLoader {
     const targetPath = configPath || path.join(process.cwd(), this.DEFAULT_CONFIG_PATH);
     let userConfig: Config = { policies: [] };
 
+    // Load YAML config
     if (fs.existsSync(targetPath)) {
       try {
         const fileContent = fs.readFileSync(targetPath, 'utf8');
@@ -54,6 +55,20 @@ export class ConfigLoader {
       }
     });
 
-    return { policies: mergedPolicies };
+    // Start from defaults, then apply merged policies and any user-specified top-level options
+    const merged: Config = {
+      ...defaults,
+      policies: mergedPolicies,
+    };
+
+    if (user.outDir !== undefined) {
+      merged.outDir = user.outDir;
+    }
+
+    if (user.outputFormat !== undefined) {
+      merged.outputFormat = user.outputFormat;
+    }
+
+    return merged;
   }
 }

@@ -55,61 +55,66 @@ sitemap-qa analyze https://example.com --verbose
 - Checks `robots.txt` for sitemap declarations
 - Tests standard paths (`/sitemap.xml`, `/sitemap_index.xml`, etc.)
 - Recursively follows sitemap indexes
-- Handles multiple sitemaps and formats
-- Detects and processes malformed sitemap indexes (sitemaps listed in `<url>` blocks instead of `<sitemap>` blocks)
+- Handles multiple sitemaps in supported formats (XML, compressed XML `.xml.gz`, and dynamically generated/PHP-based sitemaps)
 
 ### Risk Detection Patterns
 
-| Risk Category | Severity | Examples | Can Be Excluded |
-|--------------|----------|----------|-----------------|
-| **Environment Leakage** | High | `staging.example.com`, `/dev/`, `/test/` | ✅ Via patterns |
-| **Admin Paths** | High | `/admin`, `/dashboard`, `/config`, `/console` | ✅ Via patterns |
-| **Internal Content** | Medium | `/internal` paths | ✅ Via patterns |
-| **Sensitive Parameters** | High | `?token=`, `?apikey=`, `?password=` | ✅ Via patterns |
-| **Test Content** | Medium | `/test-`, `sample-`, `demo-` | ✅ Via patterns |
-| **Protocol Inconsistency** | Medium | HTTP URLs in HTTPS sitemaps | ❌ Always detected |
-| **Domain Mismatch** | Medium | Different domains in sitemap | ❌ Always detected |
+The tool comes with a set of default policies, but you can fully customize them in your `sitemap-qa.yaml`.
+
+| Risk Category | Description | Example Patterns |
+|--------------|-------------|------------------|
+| **Security & Admin** | Detects exposed administrative interfaces and sensitive configuration files. | `**/admin/**`, `**/.env*`, `/wp-admin` |
+| **Environment Leakage** | Finds staging or development URLs that shouldn't be in production sitemaps. | `**/staging.**`, `**/dev.**` |
+| **Sensitive Files** | Flags database backups, archives, and other sensitive file types. | `**/*.{sql,bak,zip,tar}`, `**/*.tar.gz` |
+
+### Customizing Risks
+
+You can add your own categories and patterns to the `sitemap-qa.yaml` file. Patterns support `literal`, `glob`, and `regex` matching.
+
+```yaml
+policies:
+  - category: "Internal API"
+    patterns:
+      - type: "glob"
+        value: "**/api/v1/internal/**"
+        reason: "Internal API version 1 should not be exposed."
+```
 
 
 ### Output Formats
 
 #### HTML Report (Interactive)
 The HTML report provides an interactive, visually appealing view with:
-- Expandable/collapsible sections by severity
-- Download buttons to export all URLs per category
+- Expandable/collapsible sections by category
+- Download buttons to export all URLs per finding
 - Clean, modern design with hover effects
 - Portable single-file format
 
 #### JSON Report (Machine-Readable)
 ```json
 {
-  "analysis_metadata": {
-    "base_url": "https://example.com",
-    "tool_version": "1.0.0",
-    "analysis_type": "rule-based analysis",
-    "analysis_timestamp": "2025-12-11T00:00:00.000Z",
-    "execution_time_ms": 4523
+  "metadata": {
+    "generatedAt": "2025-12-24T12:00:00.000Z",
+    "durationMs": 1240
   },
-  "sitemaps_discovered": [
-    "https://example.com/sitemap.xml"
-  ],
-  "suspicious_groups": [
-    {
-      "category": "environment_leakage",
-      "severity": "high",
-      "count": 3,
-      "rationale": "Production sitemap contains staging URLs",
-      "sample_urls": ["..."],
-      "recommended_action": "Verify sitemap generation excludes non-production environments"
-    }
-  ],
   "summary": {
-    "high_severity_count": 2,
-    "medium_severity_count": 1,
-    "low_severity_count": 0,
-    "total_risky_urls": 8,
-    "overall_status": "issues_found"
-  }
+    "totalUrls": 895,
+    "totalRisks": 2,
+    "urlsWithRisksCount": 1
+  },
+  "findings": [
+    {
+      "loc": "https://example.com/admin/login",
+      "risks": [
+        {
+          "category": "Security & Admin",
+          "pattern": "**/admin/**",
+          "type": "glob",
+          "reason": "Administrative interfaces should not be publicly indexed."
+        }
+      ]
+    }
+  ]
 }
 ```
 
@@ -126,93 +131,90 @@ Arguments:
   url                          Base URL of the website to analyze
 
 Options:
-  --timeout <seconds>          HTTP request timeout in seconds (default: 30)
-  --output <format>            Output format: html or json (default: "html")
-  --output-dir <path>          Output directory for reports (default: "./sitemap-qa/report")
-  --output-file <path>         Custom output filename
-  --accepted-patterns <list>   Comma-separated patterns to exclude from risk detection
-  --verbose                    Enable verbose logging
+  -c, --config <path>          Path to sitemap-qa.yaml
+  -o, --output <format>        Output format: json, html, or all (default: "all")
+  -d, --out-dir <path>         Output directory for reports (default: ".")
   -h, --help                   Display help for command
 ```
 
 ### Examples
 
 ```bash
-# Basic analysis with HTML report (default)
+# Basic analysis with both HTML and JSON reports (default)
 sitemap-qa analyze https://example.com
 
-# JSON output for CI/CD integration
+# JSON output only
 sitemap-qa analyze https://example.com --output json
 
 # Custom output directory
-sitemap-qa analyze https://example.com --output-dir ./reports
+sitemap-qa analyze https://example.com --out-dir ./reports
 
-# Exclude specific URL patterns from detection
-sitemap-qa analyze https://example.com --accepted-patterns "internal-*,test-*"
-
-# Increase timeout for slow servers
-sitemap-qa analyze https://example.com --timeout 60
-
-# Verbose mode for debugging
-sitemap-qa analyze https://example.com --verbose
+# Use a specific configuration file
+sitemap-qa analyze https://example.com --config ./custom-config.yaml
 ```
 
 ---
 
 ## 🔧 Configuration
 
-Create a `.sitemap-qa.config.json` file in your project root or `~/.sitemap-qa/config.json` for global settings:
+Create a `sitemap-qa.yaml` file in your project root to define your monitoring policies and tool settings:
 
-```json
-{
-  "timeout": 30,
-  "concurrency": 10,
-  "outputFormat": "html",
-  "outputDir": "./sitemap-qa/report",
-  "verbose": false,
-  "acceptedPatterns": [
-    "test-*",
-    "staging-*"
-  ]
-}
+```yaml
+# Tool Settings
+# Default outDir is "."; this example uses a custom reports directory
+outDir: "./sitemap-qa/report" # custom output directory
+outputFormat: "all" # Options: json, html, all
+
+# Monitoring Policies
+policies:
+  - category: "Security & Admin"
+    patterns:
+      - type: "glob"
+        value: "**/admin/**"
+        reason: "Administrative interfaces should not be publicly indexed."
+      - type: "literal"
+        value: "/wp-admin"
+        reason: "WordPress admin paths are common attack vectors."
+      - type: "regex"
+        value: ".*\\.php$"
+        reason: "PHP file detected"
 ```
 
 ### Configuration Options
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `timeout` | number | `30` | HTTP request timeout in seconds (1-300) |
-| `concurrency` | number | `10` | Number of concurrent HTTP requests |
-| `parsingConcurrency` | number | `50` | Number of concurrent sitemap parsers |
-| `discoveryConcurrency` | number | `50` | Number of concurrent sitemap index fetches |
-| `maxSitemaps` | number | `1000` | Maximum number of sitemaps to process |
-| `outputFormat` | string | `"html"` | Output format: `"html"` or `"json"` |
-| `outputDir` | string | `"./sitemap-qa/report"` | Directory for generated reports |
-| `verbose` | boolean | `false` | Enable detailed logging |
-| `acceptedPatterns` | string[] | `[]` | URL patterns to exclude from risk detection |
+| `outDir` | string | `"."` | Directory for generated reports (current working directory by default) |
+| `outputFormat` | string | `"all"` | Report types to generate: `json`, `html`, or `all` |
+| `policies` | array | `[]` | List of monitoring policies with patterns |
 
-### Accepted Patterns
+> Note: The earlier `sitemap-qa.yaml` example sets `outDir: "./sitemap-qa/report"` as a recommended path. If you omit `outDir`, the default is `"."` (the current working directory).
+### Policy Patterns
 
-Exclude specific URLs from risk detection using wildcard patterns:
+Define patterns to detect risks in your sitemaps:
 
-```json
-{
-  "acceptedPatterns": [
-    "testing-*",                 // Matches: test-player, test-player-stats
-    "https://example.com/admin/*",  // Matches: any URL under /admin/
-    "/special-case"                 // Matches: exact path segment
-  ]
-}
+```yaml
+policies:
+  - category: "Custom Rules"
+    patterns:
+      - type: "literal"
+        value: "test"
+        reason: "Test URL found"
+      - type: "glob"
+        value: "**/internal/*"
+        reason: "Internal path exposed"
+      - type: "regex"
+        value: "api/v[0-9]/"
+        reason: "API versioning detected"
 ```
 
-**Pattern Syntax:**
-- Use `*` as a wildcard (matches any characters within a path segment)
-- Patterns are case-insensitive
-- Special characters are automatically escaped
-- Patterns match against the full URL
-- Full URLs or path fragments both work
+**Rule Types:**
+- `literal`: Exact string match
+- `glob`: Wildcard patterns (e.g., `**/admin/**`)
+- `regex`: Regular expression matching (patterns are YAML strings and must use proper escaping)
+  - When defining regex patterns in `sitemap-qa.yaml`, remember they are YAML strings, so you must escape backslashes (for example, `".*\\\\.php$"` in YAML corresponds to the regex `.*\.php$`).
 
-**Priority:** CLI options > Project config (`.sitemap-qa.config.json`) > Global config (`~/.sitemap-qa/config.json`) > Defaults
+**Priority:** CLI options > Project config (`sitemap-qa.yaml`) > Defaults
 
 ## 📝 License
 
@@ -225,6 +227,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 Built with:
 - [Commander.js](https://github.com/tj/commander.js) - CLI framework
 - [Chalk](https://github.com/chalk/chalk) - Terminal styling
+- [Undici](https://github.com/nodejs/undici) - High-performance HTTP client
+- [Fast-XML-Parser](https://github.com/NaturalIntelligence/fast-xml-parser) - Fast XML parsing
+- [Zod](https://zod.dev/) - Schema validation
+- [Micromatch](https://github.com/micromatch/micromatch) - Glob pattern matching
 - [Vitest](https://vitest.dev/) - Testing framework
 - [TypeScript](https://www.typescriptlang.org/) - Type safety
 
