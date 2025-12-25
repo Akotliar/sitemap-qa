@@ -133,7 +133,7 @@ Arguments:
 Options:
   -c, --config <path>          Path to sitemap-qa.yaml
   -o, --output <format>        Output format: json, html, or all (default: "all")
-  -d, --out-dir <path>         Output directory for reports (default: "./sitemap-qa/report")
+  -d, --out-dir <path>         Output directory for reports (default: ".")
   -h, --help                   Display help for command
 ```
 
