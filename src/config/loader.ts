@@ -55,10 +55,20 @@ export class ConfigLoader {
       }
     });
 
-    return { 
+    // Start from defaults, then apply merged policies and any user-specified top-level options
+    const merged: Config = {
+      ...defaults,
       policies: mergedPolicies,
-      outDir: user.outDir || defaults.outDir,
-      outputFormat: user.outputFormat || defaults.outputFormat
     };
+
+    if (user.outDir !== undefined) {
+      merged.outDir = user.outDir;
+    }
+
+    if (user.outputFormat !== undefined) {
+      merged.outputFormat = user.outputFormat;
+    }
+
+    return merged;
   }
 }
