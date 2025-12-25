@@ -13,12 +13,12 @@ Sitemap-QA is a command-line tool that automatically discovers, parses, and anal
 
 ## 🎯 Why Sitemap-QA?
 
-Unlike SEO-focused sitemap validators, Sitemap-QA is designed specifically for **QA validation and risk detection**:
+Unlike SEO-focused sitemap validators, Sitemap-QA is designed specifically for **QA validation and risk detection** using a **Policy-as-Code** approach:
 
 - ✅ **Detect environment leakage** — Find staging, dev, or test URLs that shouldn't be in production sitemaps
 - ✅ **Identify exposed admin paths** — Catch `/admin`, `/dashboard`, and internal routes in public indexes
-- ✅ **Flag sensitive parameters** — Detect API keys, tokens, or passwords in sitemap URLs
-- ✅ **Validate domain consistency** — Find protocol mismatches and subdomain issues
+- ✅ **Flag sensitive files** — Detect database backups, environment files, and archives
+- ✅ **Fully Customizable** — Define your own risk categories and patterns using Literal, Glob, or Regex matching
 - ✅ **Fast and automated** — Analyze thousands of URLs in seconds with detailed reports
 
 Perfect for CI/CD pipelines, pre-release validation, and security audits.
@@ -42,9 +42,6 @@ sitemap-qa analyze https://example.com
 
 # Generate JSON output for CI/CD
 sitemap-qa analyze https://example.com --output json > report.json
-
-# Increase verbosity for debugging
-sitemap-qa analyze https://example.com --verbose
 ```
 
 ---
