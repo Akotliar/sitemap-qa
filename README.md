@@ -55,7 +55,7 @@ sitemap-qa analyze https://example.com --verbose
 - Checks `robots.txt` for sitemap declarations
 - Tests standard paths (`/sitemap.xml`, `/sitemap_index.xml`, etc.)
 - Recursively follows sitemap indexes
-- Handles multiple sitemaps and compressed formats (`.xml.gz`)
+- Handles multiple sitemaps in supported formats (XML, compressed XML `.xml.gz`, and dynamically generated/PHP-based sitemaps)
 
 ### Risk Detection Patterns
 
