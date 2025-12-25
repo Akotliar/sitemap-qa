@@ -61,7 +61,7 @@ sitemap-qa analyze https://example.com --verbose
 
 The tool comes with a set of default policies, but you can fully customize them in your `sitemap-qa.yaml`.
 
-| Risk Category | Description | Default Patterns |
+| Risk Category | Description | Example Patterns |
 |--------------|-------------|------------------|
 | **Security & Admin** | Detects exposed administrative interfaces and sensitive configuration files. | `**/admin/**`, `**/.env*`, `/wp-admin` |
 | **Environment Leakage** | Finds staging or development URLs that shouldn't be in production sitemaps. | `**/staging.**`, `**/dev.**` |
