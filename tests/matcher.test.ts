@@ -56,7 +56,7 @@ describe('MatcherService', () => {
 
     expect(risks).toHaveLength(0);
     expect(urlObj.ignored).toBe(true);
-    expect(urlObj.ignoredBy).toBe('/acceptable-path');
+    expect(urlObj.ignoredBy).toBe('This path is known to be safe.');
   });
 
   it('should mark URL as ignored if it matches an acceptable glob pattern', () => {
@@ -70,7 +70,7 @@ describe('MatcherService', () => {
 
     expect(risks).toHaveLength(0);
     expect(urlObj.ignored).toBe(true);
-    expect(urlObj.ignoredBy).toBe('**/safe/**');
+    expect(urlObj.ignoredBy).toBe('All paths under safe/ are acceptable.');
   });
 
   it('should mark URL as ignored if it matches an acceptable regex pattern', () => {
@@ -84,7 +84,7 @@ describe('MatcherService', () => {
 
     expect(risks).toHaveLength(0);
     expect(urlObj.ignored).toBe(true);
-    expect(urlObj.ignoredBy).toBe('/regex-safe-.*$');
+    expect(urlObj.ignoredBy).toBe('Regex safe paths.');
   });
 
   it('should prioritize acceptable patterns over risk patterns', () => {
@@ -99,10 +99,30 @@ describe('MatcherService', () => {
 
     expect(risks).toHaveLength(0);
     expect(urlObj.ignored).toBe(true);
-    expect(urlObj.ignoredBy).toBe('**/safe/**');
-    // Verify suppressed risks are attached
-    expect(urlObj.risks).toHaveLength(1);
-    expect(urlObj.risks[0].category).toBe('Security');
+    expect(urlObj.ignoredBy).toBe('All paths under safe/ are acceptable.');
+    // Verify no risks are attached because we return early
+    expect(urlObj.risks).toHaveLength(0);
+  });
+
+  it('should NOT suppress domain consistency risks even if URL matches an acceptable pattern', () => {
+    const config: Config = {
+      ...mockConfig,
+      enforceDomainConsistency: true
+    };
+    const matcher = new MatcherService(config, 'https://example.com');
+    const urlObj: SitemapUrl = {
+      loc: 'https://other-domain.com/acceptable-path',
+      source: 'sitemap.xml',
+      risks: []
+    };
+
+    const risks = matcher.match(urlObj);
+
+    // Domain consistency should still be flagged
+    expect(risks).toHaveLength(1);
+    expect(risks[0].category).toBe('Domain Consistency');
+    expect(urlObj.ignored).toBe(true);
+    expect(urlObj.ignoredBy).toBe('This path is known to be safe.');
   });
 
   it('should return risks if URL does not match any acceptable pattern', () => {

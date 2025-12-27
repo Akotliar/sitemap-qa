@@ -23,7 +23,8 @@ export class MatcherService {
   match(urlObj: SitemapUrl): Risk[] {
     const risks: Risk[] = [];
 
-    // 1. Domain Consistency Check
+    // 1. Domain Consistency Check (Highest Priority)
+    // This check always runs and its risks are never suppressed by acceptable patterns.
     if (this.config.enforceDomainConsistency && this.rootDomain) {
       try {
         const currentDomain = new URL(urlObj.loc).hostname
@@ -42,7 +43,18 @@ export class MatcherService {
       }
     }
 
-    // 2. Policy Checks
+    // 2. Check acceptable patterns (Allowlist)
+    // If a URL matches an acceptable pattern, it is marked as ignored.
+    // We return early, but we MUST still return any domain consistency risks.
+    for (const pattern of this.config.acceptable_patterns) {
+      if (this.isMatch(urlObj.loc, pattern)) {
+        urlObj.ignored = true;
+        urlObj.ignoredBy = pattern.reason;
+        return risks; // Return any existing risks (e.g. Domain Consistency)
+      }
+    }
+
+    // 3. Policy Checks
     for (const policy of this.config.policies) {
       for (const pattern of policy.patterns) {
         if (this.isMatch(urlObj.loc, pattern)) {
@@ -53,18 +65,6 @@ export class MatcherService {
             reason: pattern.reason,
           });
         }
-      }
-    }
-
-    // 3. Check acceptable patterns (Allowlist)
-    // If a URL matches an acceptable pattern, it is marked as ignored.
-    // We do this AFTER risk detection so that we can still see what risks were suppressed.
-    for (const pattern of this.config.acceptable_patterns) {
-      if (this.isMatch(urlObj.loc, pattern)) {
-        urlObj.ignored = true;
-        urlObj.ignoredBy = pattern.value;
-        urlObj.risks = risks; // Store suppressed risks for reporting
-        return []; // Return no active risks
       }
     }
 
