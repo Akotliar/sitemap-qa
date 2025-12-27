@@ -104,7 +104,7 @@ describe('MatcherService', () => {
     expect(urlObj.risks).toHaveLength(0);
   });
 
-  it('should NOT suppress domain consistency risks even if URL matches an acceptable pattern', () => {
+  it('should still return domain consistency risks from matcher.match() even if URL is ignored by an acceptable pattern', () => {
     const config: Config = {
       ...mockConfig,
       enforceDomainConsistency: true
