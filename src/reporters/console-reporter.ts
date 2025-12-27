@@ -7,6 +7,7 @@ export class ConsoleReporter implements Reporter {
     console.log(`Total URLs Scanned: ${data.totalUrls}`);
     console.log(`Total Risks Found:  ${data.totalRisks > 0 ? chalk.red(data.totalRisks) : chalk.green(0)}`);
     console.log(`URLs with Risks:    ${data.urlsWithRisks.length}`);
+    console.log(`URLs Ignored:       ${data.ignoredUrls.length > 0 ? chalk.yellow(data.ignoredUrls.length) : 0}`);
     console.log(`Duration:           ${((data.endTime.getTime() - data.startTime.getTime()) / 1000).toFixed(2)}s`);
 
     if (data.urlsWithRisks.length > 0) {

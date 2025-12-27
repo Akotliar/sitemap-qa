@@ -18,6 +18,7 @@ Unlike SEO-focused sitemap validators, Sitemap-QA is designed specifically for *
 - ✅ **Detect environment leakage** — Find staging, dev, or test URLs that shouldn't be in production sitemaps
 - ✅ **Identify exposed admin paths** — Catch `/admin`, `/dashboard`, and internal routes in public indexes
 - ✅ **Flag sensitive files** — Detect database backups, environment files, and archives
+- ✅ **Acceptable Patterns (Allowlist)** — Exclude known safe URLs from being flagged as risks
 - ✅ **Fully Customizable** — Define your own risk categories and patterns using Literal, Glob, or Regex matching
 - ✅ **Fast and automated** — Analyze thousands of URLs in seconds with detailed reports
 
@@ -77,6 +78,23 @@ policies:
         reason: "Internal API version 1 should not be exposed."
 ```
 
+### Acceptable Patterns (Allowlist)
+
+To prevent false positives, you can define "acceptable patterns" in your `sitemap-qa.yaml`. URLs matching these patterns will be ignored by the detection engine, even if they match a risk pattern.
+
+```yaml
+acceptable_patterns:
+  - type: "literal"
+    value: "/acceptable-path"
+    reason: "This path is known to be safe."
+  - type: "glob"
+    value: "**/safe/**"
+    reason: "All paths under safe/ are acceptable."
+  - type: "regex"
+    value: "/v[0-9]+/public/"
+    reason: "Public API versions are acceptable."
+```
+
 
 ### Output Formats
 
@@ -97,7 +115,8 @@ The HTML report provides an interactive, visually appealing view with:
   "summary": {
     "totalUrls": 895,
     "totalRisks": 2,
-    "urlsWithRisksCount": 1
+    "urlsWithRisksCount": 1,
+    "ignoredUrlsCount": 5
   },
   "findings": [
     {
@@ -163,6 +182,14 @@ outDir: "./sitemap-qa/report" # custom output directory
 outputFormat: "all" # Options: json, html, all
 
 # Monitoring Policies
+acceptable_patterns:
+  - type: "literal"
+    value: "/acceptable-path"
+    reason: "Example of an acceptable path that should not be flagged."
+  - type: "glob"
+    value: "**/public-docs/**"
+    reason: "Public documentation is always acceptable."
+
 policies:
   - category: "Security & Admin"
     patterns:
@@ -179,10 +206,10 @@ policies:
 
 ### Configuration Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
 | `outDir` | string | `"."` | Directory for generated reports (current working directory by default) |
 | `outputFormat` | string | `"all"` | Report types to generate: `json`, `html`, or `all` |
+| `enforceDomainConsistency` | boolean | `false` | If true, flags URLs that don't match the root sitemap domain (ignoring `www.`) |
+| `acceptable_patterns` | array | `[]` | List of patterns to exclude from risk analysis |
 | `policies` | array | `[]` | List of monitoring policies with patterns |
 
 > Note: The earlier `sitemap-qa.yaml` example sets `outDir: "./sitemap-qa/report"` as a recommended path. If you omit `outDir`, the default is `"."` (the current working directory).

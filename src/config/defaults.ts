@@ -1,6 +1,9 @@
 import { type Config } from './schema';
 
 export const DEFAULT_POLICIES: Config = {
+  acceptable_patterns: [],
+  outputFormat: "all",
+  enforceDomainConsistency: false,
   policies: [
     {
       category: "Security & Admin",

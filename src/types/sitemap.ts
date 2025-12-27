@@ -12,4 +12,6 @@ export interface SitemapUrl {
   changefreq?: string;
   priority?: string;
   risks: Risk[];
+  ignored?: boolean;
+  ignoredBy?: string;
 }

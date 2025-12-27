@@ -4,16 +4,50 @@ import { type SitemapUrl, type Risk } from '../types/sitemap';
 
 export class MatcherService {
   private readonly config: Config;
+  private readonly rootDomain?: string;
 
-  constructor(config: Config) {
+  constructor(config: Config, rootUrl?: string) {
     this.config = config;
+    if (rootUrl) {
+      try {
+        this.rootDomain = new URL(rootUrl).hostname.replace(/^www\./, '');
+      } catch {
+        // Invalid URL, ignore
+      }
+    }
   }
 
   /**
    * Matches a URL against all policies and returns detected risks.
    */
   match(urlObj: SitemapUrl): Risk[] {
+    // Check acceptable patterns first
+    for (const pattern of this.config.acceptable_patterns) {
+      if (this.isMatch(urlObj.loc, pattern)) {
+        urlObj.ignored = true;
+        urlObj.ignoredBy = pattern.value;
+        return [];
+      }
+    }
+
     const risks: Risk[] = [];
+
+    // Domain Consistency Check
+    if (this.config.enforceDomainConsistency && this.rootDomain) {
+      try {
+        const currentDomain = new URL(urlObj.loc).hostname.replace(/^www\./, '');
+        if (currentDomain !== this.rootDomain) {
+          risks.push({
+            category: 'Domain Consistency',
+            pattern: this.rootDomain,
+            type: 'literal',
+            reason: `URL domain mismatch: expected ${this.rootDomain} (or www.${this.rootDomain}), but found ${currentDomain}.`,
+          });
+        }
+      } catch {
+        // Invalid URL in sitemap
+      }
+    }
 
     for (const policy of this.config.policies) {
       for (const pattern of policy.patterns) {

@@ -83,7 +83,7 @@ export class HtmlReporter implements Reporter {
         
         .summary-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(5, 1fr);
             border-bottom: 1px solid var(--border);
             margin-bottom: 40px;
         }
@@ -255,6 +255,10 @@ export class HtmlReporter implements Reporter {
             <p>${data.totalRisks}</p>
         </div>
         <div class="summary-card">
+            <h3>URLs Ignored</h3>
+            <p>${data.ignoredUrls.length}</p>
+        </div>
+        <div class="summary-card">
             <h3>Scan Time</h3>
             <p>${duration}s</p>
         </div>
@@ -267,6 +271,15 @@ export class HtmlReporter implements Reporter {
                 ${data.discoveredSitemaps.map(s => `<div class="url-item">${s}</div>`).join('')}
             </div>
         </details>
+
+        ${data.ignoredUrls.length > 0 ? `
+        <details>
+            <summary>Ignored URLs (${data.ignoredUrls.length})</summary>
+            <div style="padding: 20px; background: var(--bg-light);">
+                ${data.ignoredUrls.map(u => `<div class="url-item" title="Ignored by: ${u.ignoredBy}">${u.loc} <span style="color: var(--text-muted); font-size: 11px;">(by ${u.ignoredBy})</span></div>`).join('')}
+            </div>
+        </details>
+        ` : ''}
 
         ${Object.entries(categories).map(([category, findings]: [string, any]) => {
             const totalCategoryUrls = Object.values(findings).reduce((acc: number, f: any) => acc + f.urls.length, 0);
