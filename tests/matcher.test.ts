@@ -5,6 +5,7 @@ import { SitemapUrl } from '../src/types/sitemap';
 
 describe('MatcherService', () => {
   const mockConfig: Config = {
+    enforceDomainConsistency: true,
     acceptable_patterns: [
       {
         type: 'literal',

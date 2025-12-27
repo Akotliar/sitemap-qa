@@ -6,6 +6,11 @@ import chalk from 'chalk';
 const DEFAULT_CONFIG = `# sitemap-qa configuration
 # This file defines the risk categories and patterns to monitor.
 
+# Tool Settings
+outDir: "./sitemap-qa/report"
+outputFormat: "all" # Options: json, html, all
+enforceDomainConsistency: true
+
 # Risk Categories
 # Each category contains a list of patterns to match against URLs found in sitemaps.
 # Patterns can be:

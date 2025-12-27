@@ -18,6 +18,7 @@ Unlike SEO-focused sitemap validators, Sitemap-QA is designed specifically for *
 - ✅ **Detect environment leakage** — Find staging, dev, or test URLs that shouldn't be in production sitemaps
 - ✅ **Identify exposed admin paths** — Catch `/admin`, `/dashboard`, and internal routes in public indexes
 - ✅ **Flag sensitive files** — Detect database backups, environment files, and archives
+- ✅ **Domain Consistency** — Automatically flag URLs that point to external or incorrect domains (handles `www.` normalization)
 - ✅ **Acceptable Patterns (Allowlist)** — Exclude known safe URLs from being flagged as risks
 - ✅ **Fully Customizable** — Define your own risk categories and patterns using Literal, Glob, or Regex matching
 - ✅ **Fast and automated** — Analyze thousands of URLs in seconds with detailed reports
@@ -64,36 +65,11 @@ The tool comes with a set of default policies, but you can fully customize them 
 | **Security & Admin** | Detects exposed administrative interfaces and sensitive configuration files. | `**/admin/**`, `**/.env*`, `/wp-admin` |
 | **Environment Leakage** | Finds staging or development URLs that shouldn't be in production sitemaps. | `**/staging.**`, `**/dev.**` |
 | **Sensitive Files** | Flags database backups, archives, and other sensitive file types. | `**/*.{sql,bak,zip,tar}`, `**/*.tar.gz` |
+| **Domain Consistency** | Detects URLs that don't match the target domain (ignoring `www.` differences). | `example.com` vs `other.com` |
 
 ### Customizing Risks
 
-You can add your own categories and patterns to the `sitemap-qa.yaml` file. Patterns support `literal`, `glob`, and `regex` matching.
-
-```yaml
-policies:
-  - category: "Internal API"
-    patterns:
-      - type: "glob"
-        value: "**/api/v1/internal/**"
-        reason: "Internal API version 1 should not be exposed."
-```
-
-### Acceptable Patterns (Allowlist)
-
-To prevent false positives, you can define "acceptable patterns" in your `sitemap-qa.yaml`. URLs matching these patterns will be ignored by the detection engine, even if they match a risk pattern.
-
-```yaml
-acceptable_patterns:
-  - type: "literal"
-    value: "/acceptable-path"
-    reason: "This path is known to be safe."
-  - type: "glob"
-    value: "**/safe/**"
-    reason: "All paths under safe/ are acceptable."
-  - type: "regex"
-    value: "/v[0-9]+/public/"
-    reason: "Public API versions are acceptable."
-```
+You can add your own categories and patterns to the `sitemap-qa.yaml` file. Patterns support `literal`, `glob`, and `regex` matching. See the [Configuration](#-configuration) section for details.
 
 
 ### Output Formats
@@ -180,6 +156,7 @@ Create a `sitemap-qa.yaml` file in your project root to define your monitoring p
 # Default outDir is "."; this example uses a custom reports directory
 outDir: "./sitemap-qa/report" # custom output directory
 outputFormat: "all" # Options: json, html, all
+enforceDomainConsistency: true # Flag URLs from other domains
 
 # Monitoring Policies
 acceptable_patterns:
@@ -206,37 +183,14 @@ policies:
 
 ### Configuration Options
 
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
 | `outDir` | string | `"."` | Directory for generated reports (current working directory by default) |
 | `outputFormat` | string | `"all"` | Report types to generate: `json`, `html`, or `all` |
 | `enforceDomainConsistency` | boolean | `false` | If true, flags URLs that don't match the root sitemap domain (ignoring `www.`) |
 | `acceptable_patterns` | array | `[]` | List of patterns to exclude from risk analysis |
 | `policies` | array | `[]` | List of monitoring policies with patterns |
 
-> Note: The earlier `sitemap-qa.yaml` example sets `outDir: "./sitemap-qa/report"` as a recommended path. If you omit `outDir`, the default is `"."` (the current working directory).
-### Policy Patterns
-
-Define patterns to detect risks in your sitemaps:
-
-```yaml
-policies:
-  - category: "Custom Rules"
-    patterns:
-      - type: "literal"
-        value: "test"
-        reason: "Test URL found"
-      - type: "glob"
-        value: "**/internal/*"
-        reason: "Internal path exposed"
-      - type: "regex"
-        value: "api/v[0-9]/"
-        reason: "API versioning detected"
-```
-
-**Rule Types:**
-- `literal`: Exact string match
-- `glob`: Wildcard patterns (e.g., `**/admin/**`)
-- `regex`: Regular expression matching (patterns are YAML strings and must use proper escaping)
-  - When defining regex patterns in `sitemap-qa.yaml`, remember they are YAML strings, so you must escape backslashes (for example, `".*\\\\.php$"` in YAML corresponds to the regex `.*\.php$`).
 
 **Priority:** CLI options > Project config (`sitemap-qa.yaml`) > Defaults
 
@@ -262,7 +216,7 @@ Built with:
 
 ## 📧 Support
 
-- **Issues**: [GitHub Issues](https://github.com/akotliar/sitemap-qa/issues)-
+- **Issues**: [GitHub Issues](https://github.com/akotliar/sitemap-qa/issues)
 
 ---
 
