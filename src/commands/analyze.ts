@@ -42,12 +42,12 @@ export const analyzeCommand = new Command('analyze')
         totalUrls++;
         const risks = matcher.match(urlObj);
         
-        if (urlObj.ignored) {
-          ignoredUrls.push(urlObj);
-        } else if (risks.length > 0) {
+        if (risks.length > 0) {
           urlObj.risks = risks;
           urlsWithRisks.push(urlObj);
           totalRisks += risks.length;
+        } else if (urlObj.ignored) {
+          ignoredUrls.push(urlObj);
         }
 
         if (totalUrls % 100 === 0) {

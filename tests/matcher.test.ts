@@ -104,7 +104,7 @@ describe('MatcherService', () => {
     expect(urlObj.risks).toHaveLength(0);
   });
 
-  it('should still return domain consistency risks from matcher.match() even if URL is ignored by an acceptable pattern', () => {
+  it('should NOT suppress domain consistency risks even if URL matches an acceptable pattern', () => {
     const config: Config = {
       ...mockConfig,
       enforceDomainConsistency: true
@@ -118,11 +118,50 @@ describe('MatcherService', () => {
 
     const risks = matcher.match(urlObj);
 
-    // Domain consistency should still be flagged
+    // Domain consistency should still be flagged even if the path is "acceptable"
+    // because domain mismatch is a higher-priority risk.
     expect(risks).toHaveLength(1);
     expect(risks[0].category).toBe('Domain Consistency');
+    
+    // The URL is still marked as ignored for policy checks, but the caller (analyze.ts)
+    // must prioritize the returned risks.
     expect(urlObj.ignored).toBe(true);
     expect(urlObj.ignoredBy).toBe('This path is known to be safe.');
+  });
+
+  describe('Integration with Analyze Logic', () => {
+    it('should prioritize risks over ignore status (simulating analyze.ts logic)', () => {
+      const config: Config = {
+        ...mockConfig,
+        enforceDomainConsistency: true
+      };
+      const matcher = new MatcherService(config, 'https://example.com');
+      const urlObj: SitemapUrl = {
+        loc: 'https://other-domain.com/acceptable-path',
+        source: 'sitemap.xml',
+        risks: []
+      };
+
+      const risks = matcher.match(urlObj);
+      
+      const urlsWithRisks: SitemapUrl[] = [];
+      const ignoredUrls: SitemapUrl[] = [];
+      let totalRisks = 0;
+
+      // The logic from analyze.ts
+      if (risks.length > 0) {
+        urlObj.risks = risks;
+        urlsWithRisks.push(urlObj);
+        totalRisks += risks.length;
+      } else if (urlObj.ignored) {
+        ignoredUrls.push(urlObj);
+      }
+
+      expect(totalRisks).toBe(1);
+      expect(urlsWithRisks).toHaveLength(1);
+      expect(ignoredUrls).toHaveLength(0);
+      expect(urlsWithRisks[0].risks[0].category).toBe('Domain Consistency');
+    });
   });
 
   it('should return risks if URL does not match any acceptable pattern', () => {
