@@ -70,6 +70,10 @@ export class ConfigLoader {
       merged.outputFormat = user.outputFormat;
     }
 
+    if (user.enforceDomainConsistency !== undefined) {
+      merged.enforceDomainConsistency = user.enforceDomainConsistency;
+    }
+
     return merged;
   }
 }

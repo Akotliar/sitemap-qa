@@ -30,4 +30,18 @@ describe('ConfigLoader', () => {
     expect(config.acceptable_patterns).toHaveLength(1);
     expect(config.acceptable_patterns[0].value).toBe('/user-safe');
   });
+
+  it('should merge enforceDomainConsistency from user config', () => {
+    const mockUserConfig = {
+      enforceDomainConsistency: true,
+      policies: []
+    };
+
+    vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(yaml.dump(mockUserConfig));
+
+    const config = ConfigLoader.load('sitemap-qa.yaml');
+
+    expect(config.enforceDomainConsistency).toBe(true);
+  });
 });
