@@ -100,6 +100,9 @@ describe('MatcherService', () => {
     expect(risks).toHaveLength(0);
     expect(urlObj.ignored).toBe(true);
     expect(urlObj.ignoredBy).toBe('**/safe/**');
+    // Verify suppressed risks are attached
+    expect(urlObj.risks).toHaveLength(1);
+    expect(urlObj.risks[0].category).toBe('Security');
   });
 
   it('should return risks if URL does not match any acceptable pattern', () => {
