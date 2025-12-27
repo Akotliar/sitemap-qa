@@ -40,6 +40,7 @@ export class HtmlReporter implements Reporter {
   private generateHtml(data: ReportData, categories: any): string {
     const duration = ((data.endTime.getTime() - data.startTime.getTime()) / 1000).toFixed(1);
     const timestamp = data.endTime.toLocaleString();
+    const esc = this.escapeHtml.bind(this);
 
     return `
 <!DOCTYPE html>
@@ -47,7 +48,7 @@ export class HtmlReporter implements Reporter {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sitemap Analysis - ${data.rootUrl}</title>
+    <title>Sitemap Analysis - ${esc(data.rootUrl)}</title>
     <style>
         :root {
             --bg-dark: #0f172a;
@@ -235,8 +236,8 @@ export class HtmlReporter implements Reporter {
         <div class="container">
             <h1>Sitemap Analysis</h1>
             <div class="meta">
-                <div>${data.rootUrl}</div>
-                <div>${timestamp}</div>
+                <div>${esc(data.rootUrl)}</div>
+                <div>${esc(timestamp)}</div>
             </div>
         </div>
     </header>
@@ -268,7 +269,7 @@ export class HtmlReporter implements Reporter {
         <details>
             <summary>Sitemaps Discovered (${data.discoveredSitemaps.length})</summary>
             <div style="padding: 20px; background: var(--bg-light);">
-                ${data.discoveredSitemaps.map(s => `<div class="url-item">${s}</div>`).join('')}
+                ${data.discoveredSitemaps.map(s => `<div class="url-item">${esc(s)}</div>`).join('')}
             </div>
         </details>
 
@@ -278,9 +279,9 @@ export class HtmlReporter implements Reporter {
             <div style="padding: 20px; background: var(--bg-light);">
                 ${data.ignoredUrls.map(u => {
                     const suppressedRisks = u.risks.length > 0 
-                        ? ` <span style="color: var(--danger); font-size: 11px; font-weight: bold;">[Suppressed Risks: ${[...new Set(u.risks.map(r => r.category))].join(', ')}]</span>`
+                        ? ` <span style="color: var(--danger); font-size: 11px; font-weight: bold;">[Suppressed Risks: ${[...new Set(u.risks.map(r => r.category))].map(esc).join(', ')}]</span>`
                         : '';
-                    return `<div class="url-item" title="Ignored by: ${u.ignoredBy}">${u.loc} <span style="color: var(--text-muted); font-size: 11px;">(by ${u.ignoredBy})</span>${suppressedRisks}</div>`;
+                    return `<div class="url-item" title="Ignored by: ${esc(u.ignoredBy)}">${esc(u.loc)} <span style="color: var(--text-muted); font-size: 11px;">(by ${esc(u.ignoredBy)})</span>${suppressedRisks}</div>`;
                 }).join('')}
             </div>
         </details>
@@ -291,28 +292,28 @@ export class HtmlReporter implements Reporter {
             return `
             <div class="category-section">
                 <div class="category-header">
-                    <span>${category} (${totalCategoryUrls} URLs)</span>
+                    <span>${esc(category)} (${totalCategoryUrls} URLs)</span>
                     <span>▼</span>
                 </div>
                 <div class="category-content">
                     ${Object.entries(findings).map(([pattern, finding]: [string, any]) => `
                         <div class="finding-group">
                             <div class="finding-header">
-                                <h4>${pattern}</h4>
+                                <h4>${esc(pattern)}</h4>
                                 <span class="badge">${finding.urls.length} URLs</span>
                             </div>
                             <div class="finding-description">
-                                ${finding.reason}
+                                ${esc(finding.reason)}
                             </div>
                             <div class="url-list">
                                 ${finding.urls.slice(0, 3).map((url: string) => `
-                                    <div class="url-item">${url}</div>
+                                    <div class="url-item">${esc(url)}</div>
                                 `).join('')}
                             </div>
                             ${finding.urls.length > 3 ? `
                                 <div class="more-count">... and ${finding.urls.length - 3} more</div>
                             ` : ''}
-                            <a href="#" class="btn" onclick="downloadUrls('${pattern}', ${JSON.stringify(finding.urls).replace(/"/g, '&quot;')})">
+                            <a href="#" class="btn" onclick="downloadUrls(${JSON.stringify(pattern).replace(/"/g, '&quot;')}, ${JSON.stringify(finding.urls).replace(/"/g, '&quot;')})">
                                 📥 Download All ${finding.urls.length} URLs
                             </a>
                         </div>
@@ -343,5 +344,14 @@ export class HtmlReporter implements Reporter {
 </body>
 </html>
 `;
+  }
+
+  private escapeHtml(str: string): string {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 }

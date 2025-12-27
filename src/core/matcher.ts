@@ -26,7 +26,9 @@ export class MatcherService {
     // 1. Domain Consistency Check
     if (this.config.enforceDomainConsistency && this.rootDomain) {
       try {
-        const currentDomain = new URL(urlObj.loc).hostname.replace(/^www\./, '');
+        const currentDomain = new URL(urlObj.loc).hostname
+          .replace(/^www\./, '')
+          .replace(/[^\w.-]/g, '_'); // Basic sanitization for reporting
         if (currentDomain !== this.rootDomain) {
           risks.push({
             category: 'Domain Consistency',
