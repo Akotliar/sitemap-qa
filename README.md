@@ -187,7 +187,7 @@ policies:
 |--------|------|---------|-------------|
 | `outDir` | string | `"."` | Directory for generated reports (current working directory by default) |
 | `outputFormat` | string | `"all"` | Report types to generate: `json`, `html`, or `all` |
-| `enforceDomainConsistency` | boolean | `false` | If true, flags URLs that don't match the root sitemap domain (ignoring `www.`) |
+| `enforceDomainConsistency` | boolean | `true` | If true, flags URLs that don't match the root sitemap domain (ignoring `www.`) |
 | `acceptable_patterns` | array | `[]` | List of patterns to exclude from risk analysis |
 | `policies` | array | `[]` | List of monitoring policies with patterns |
 
