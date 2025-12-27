@@ -58,6 +58,7 @@ export class ConfigLoader {
     // Start from defaults, then apply merged policies and any user-specified top-level options
     const merged: Config = {
       ...defaults,
+      acceptable_patterns: [...(defaults.acceptable_patterns || []), ...(user.acceptable_patterns || [])],
       policies: mergedPolicies,
     };
 
@@ -67,6 +68,10 @@ export class ConfigLoader {
 
     if (user.outputFormat !== undefined) {
       merged.outputFormat = user.outputFormat;
+    }
+
+    if (user.enforceDomainConsistency !== undefined) {
+      merged.enforceDomainConsistency = user.enforceDomainConsistency;
     }
 
     return merged;

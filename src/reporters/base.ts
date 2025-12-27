@@ -6,6 +6,7 @@ export interface ReportData {
   totalUrls: number;
   totalRisks: number;
   urlsWithRisks: SitemapUrl[];
+  ignoredUrls: SitemapUrl[];
   startTime: Date;
   endTime: Date;
 }

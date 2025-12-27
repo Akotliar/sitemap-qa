@@ -27,13 +27,14 @@ export const analyzeCommand = new Command('analyze')
     
     // 2. Initialize Services
     const extractor = new ExtractorService();
-    const matcher = new MatcherService(config);
+    const matcher = new MatcherService(config, url);
     
     const urlsWithRisks: SitemapUrl[] = [];
+    const ignoredUrls: SitemapUrl[] = [];
     let totalUrls = 0;
     let totalRisks = 0;
 
-    console.log(chalk.blue(`\n��� Starting analysis of ${url}...`));
+    console.log(chalk.blue(`\n🚀 Starting analysis of ${url}...`));
 
     try {
       // 3. Pipeline: Extract -> Match
@@ -45,6 +46,8 @@ export const analyzeCommand = new Command('analyze')
           urlObj.risks = risks;
           urlsWithRisks.push(urlObj);
           totalRisks += risks.length;
+        } else if (urlObj.ignored) {
+          ignoredUrls.push(urlObj);
         }
 
         if (totalUrls % 100 === 0) {
@@ -60,6 +63,7 @@ export const analyzeCommand = new Command('analyze')
         totalUrls,
         totalRisks,
         urlsWithRisks,
+        ignoredUrls,
         startTime,
         endTime,
       };

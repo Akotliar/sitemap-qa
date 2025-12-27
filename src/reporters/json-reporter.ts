@@ -18,8 +18,10 @@ export class JsonReporter implements Reporter {
         totalUrls: data.totalUrls,
         totalRisks: data.totalRisks,
         urlsWithRisksCount: data.urlsWithRisks.length,
+        ignoredUrlsCount: data.ignoredUrls.length,
       },
       findings: data.urlsWithRisks,
+      ignored: data.ignoredUrls,
     };
 
     await fs.writeFile(this.outputPath, JSON.stringify(report, null, 2), 'utf8');

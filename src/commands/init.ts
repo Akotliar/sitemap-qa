@@ -6,12 +6,27 @@ import chalk from 'chalk';
 const DEFAULT_CONFIG = `# sitemap-qa configuration
 # This file defines the risk categories and patterns to monitor.
 
+# Tool Settings
+outDir: "./sitemap-qa/report"
+outputFormat: "all" # Options: json, html, all
+enforceDomainConsistency: true
+
 # Risk Categories
 # Each category contains a list of patterns to match against URLs found in sitemaps.
 # Patterns can be:
 # - literal: Exact string match
 # - glob: Glob pattern (e.g., **/admin/**)
 # - regex: Regular expression (e.g., /\\/v[0-9]+\\//)
+
+# Acceptable Patterns
+# URLs matching these patterns will be ignored and not flagged as risks.
+acceptable_patterns:
+  - type: "literal"
+    value: "/acceptable-path"
+    reason: "Example of an acceptable path that should not be flagged."
+  - type: "glob"
+    value: "**/public-docs/**"
+    reason: "Public documentation is always acceptable."
 
 policies:
   - category: "Security & Admin"
