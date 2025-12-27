@@ -18,7 +18,7 @@ export const ConfigSchema = z.object({
   policies: z.array(PolicySchema).default([]),
   outDir: z.string().optional(),
   outputFormat: z.enum(['json', 'html', 'all']).default('all'),
-  enforceDomainConsistency: z.boolean().default(false),
+  enforceDomainConsistency: z.boolean().default(true),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
