@@ -52,9 +52,9 @@ export class ExtractorService {
     }
 
     for (const startUrl of startUrls) {
-      for await (const sitemapUrl of this.discovery.discover(startUrl)) {
-        this.discoveredSitemaps.add(sitemapUrl);
-        for await (const urlObj of this.parser.parse(sitemapUrl)) {
+      for await (const discovered of this.discovery.discover(startUrl)) {
+        this.discoveredSitemaps.add(discovered.url);
+        for await (const urlObj of this.parser.parse(discovered)) {
           const normalized = this.normalizeUrl(urlObj.loc);
           if (!this.seenUrls.has(normalized)) {
             this.seenUrls.add(normalized);

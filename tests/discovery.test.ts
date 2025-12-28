@@ -211,8 +211,9 @@ Disallow: /admin/`;
       } as any);
 
       const results: string[] = [];
-      for await (const url of discovery.discover('https://example.com/sitemap.xml')) {
-        results.push(url);
+      for await (const discovered of discovery.discover('https://example.com/sitemap.xml')) {
+        results.push(discovered.url);
+        expect(discovered.xmlData).toBe(sitemapXml);
       }
 
       expect(results).toHaveLength(1);
@@ -255,8 +256,8 @@ Disallow: /admin/`;
         } as any);
 
       const results: string[] = [];
-      for await (const url of discovery.discover('https://example.com/sitemap-index.xml')) {
-        results.push(url);
+      for await (const discovered of discovery.discover('https://example.com/sitemap-index.xml')) {
+        results.push(discovered.url);
       }
 
       expect(results).toHaveLength(2);
@@ -299,8 +300,8 @@ Disallow: /admin/`;
         } as any);
 
       const results: string[] = [];
-      for await (const url of discovery.discover('https://example.com/root-index.xml')) {
-        results.push(url);
+      for await (const discovered of discovery.discover('https://example.com/root-index.xml')) {
+        results.push(discovered.url);
       }
 
       expect(results).toHaveLength(1);
@@ -331,8 +332,8 @@ Disallow: /admin/`;
         } as any);
 
       const results: string[] = [];
-      for await (const url of discovery.discover('https://example.com/index.xml')) {
-        results.push(url);
+      for await (const discovered of discovery.discover('https://example.com/index.xml')) {
+        results.push(discovered.url);
       }
 
       expect(results).toHaveLength(1);
@@ -366,8 +367,8 @@ Disallow: /admin/`;
         } as any);
 
       const results: string[] = [];
-      for await (const url of discovery.discover('https://example.com/index.xml')) {
-        results.push(url);
+      for await (const discovered of discovery.discover('https://example.com/index.xml')) {
+        results.push(discovered.url);
       }
 
       // Should only yield once even though the sitemap appears twice
@@ -384,8 +385,8 @@ Disallow: /admin/`;
       } as any);
 
       const results: string[] = [];
-      for await (const url of discovery.discover('https://example.com/missing.xml')) {
-        results.push(url);
+      for await (const discovered of discovery.discover('https://example.com/missing.xml')) {
+        results.push(discovered.url);
       }
 
       expect(results).toHaveLength(0);
@@ -395,8 +396,8 @@ Disallow: /admin/`;
       vi.mocked(fetch).mockRejectedValueOnce(new Error('Network error'));
 
       const results: string[] = [];
-      for await (const url of discovery.discover('https://example.com/error.xml')) {
-        results.push(url);
+      for await (const discovered of discovery.discover('https://example.com/error.xml')) {
+        results.push(discovered.url);
       }
 
       expect(results).toHaveLength(0);
@@ -409,8 +410,8 @@ Disallow: /admin/`;
       } as any);
 
       const results: string[] = [];
-      for await (const url of discovery.discover('https://example.com/malformed.xml')) {
-        results.push(url);
+      for await (const discovered of discovery.discover('https://example.com/malformed.xml')) {
+        results.push(discovered.url);
       }
 
       expect(results).toHaveLength(0);
@@ -455,8 +456,8 @@ Disallow: /admin/`;
         } as any);
 
       const results: string[] = [];
-      for await (const url of discovery.discover('https://example.com/index.xml')) {
-        results.push(url);
+      for await (const discovered of discovery.discover('https://example.com/index.xml')) {
+        results.push(discovered.url);
       }
 
       expect(results).toHaveLength(2);
@@ -475,8 +476,8 @@ Disallow: /admin/`;
       } as any);
 
       const results: string[] = [];
-      for await (const url of discovery.discover('https://example.com/empty-index.xml')) {
-        results.push(url);
+      for await (const discovered of discovery.discover('https://example.com/empty-index.xml')) {
+        results.push(discovered.url);
       }
 
       expect(results).toHaveLength(0);
@@ -488,8 +489,8 @@ Disallow: /admin/`;
       } as any);
 
       const results: string[] = [];
-      for await (const url of discovery.discover('https://example.com/error.xml')) {
-        results.push(url);
+      for await (const discovered of discovery.discover('https://example.com/error.xml')) {
+        results.push(discovered.url);
       }
 
       expect(results).toHaveLength(0);
