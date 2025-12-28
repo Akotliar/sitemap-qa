@@ -14,15 +14,26 @@ export class SitemapParser {
 
   /**
    * Parses a leaf sitemap and yields SitemapUrl objects.
+   * Can accept either a URL to fetch or pre-fetched XML data with the source URL.
    * Note: For true streaming of massive files, we'd use a SAX-like approach.
    * fast-xml-parser's parse() is fast but loads the whole string.
    * Given the 50k URL requirement, we'll use a more memory-efficient approach if needed,
    * but let's start with a clean AsyncGenerator interface.
    */
-  async *parse(sitemapUrl: string): AsyncGenerator<SitemapUrl> {
+  async *parse(sitemapUrlOrData: string | { url: string; xmlData: string }): AsyncGenerator<SitemapUrl> {
+    let sitemapUrl: string = typeof sitemapUrlOrData === 'string' ? sitemapUrlOrData : sitemapUrlOrData.url;
     try {
-      const response = await fetch(sitemapUrl);
-      const xmlData = await response.text();
+      let xmlData: string;
+
+      if (typeof sitemapUrlOrData === 'string') {
+        // Legacy behavior: fetch the sitemap
+        const response = await fetch(sitemapUrl);
+        xmlData = await response.text();
+      } else {
+        // New behavior: use pre-fetched data
+        xmlData = sitemapUrlOrData.xmlData;
+      }
+
       const jsonObj = this.parser.parse(xmlData);
 
       if (jsonObj.urlset && jsonObj.urlset.url) {

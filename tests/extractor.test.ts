@@ -247,15 +247,7 @@ describe('ExtractorService', () => {
         } as any)
         .mockResolvedValueOnce({
           status: 200,
-          text: async () => sitemap1Xml, // For parser.parse
-        } as any)
-        .mockResolvedValueOnce({
-          status: 200,
           text: async () => sitemap2Xml,
-        } as any)
-        .mockResolvedValueOnce({
-          status: 200,
-          text: async () => sitemap2Xml, // For parser.parse
         } as any);
 
       const urls = [];
@@ -362,15 +354,7 @@ Sitemap: https://example.com/sitemap2.xml`;
         } as any)
         .mockResolvedValueOnce({
           status: 200,
-          text: async () => sitemap1Xml, // For parser.parse
-        } as any)
-        .mockResolvedValueOnce({
-          status: 200,
           text: async () => sitemap2Xml,
-        } as any)
-        .mockResolvedValueOnce({
-          status: 200,
-          text: async () => sitemap2Xml, // For parser.parse
         } as any);
 
       const urls = [];
@@ -435,15 +419,7 @@ Sitemap: https://example.com/sitemap2.xml`;
         } as any)
         .mockResolvedValueOnce({
           status: 200,
-          text: async () => sitemap1Xml, // For parser.parse
-        } as any)
-        .mockResolvedValueOnce({
-          status: 200,
           text: async () => sitemap2Xml,
-        } as any)
-        .mockResolvedValueOnce({
-          status: 200,
-          text: async () => sitemap2Xml, // For parser.parse
         } as any);
 
       const urls = [];

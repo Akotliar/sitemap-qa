@@ -1,6 +1,11 @@
 import { fetch } from 'undici';
 import { XMLParser } from 'fast-xml-parser';
 
+export interface DiscoveredSitemap {
+  url: string;
+  xmlData: string;
+}
+
 export class DiscoveryService {
   private readonly parser: XMLParser;
   private readonly visited = new Set<string>();
@@ -62,8 +67,9 @@ export class DiscoveryService {
 
   /**
    * Recursively discovers all leaf sitemaps from a root URL.
+   * Returns both the sitemap URL and its XML data to avoid duplicate fetches.
    */
-  async *discover(rootUrl: string): AsyncGenerator<string> {
+  async *discover(rootUrl: string): AsyncGenerator<DiscoveredSitemap> {
     const queue: string[] = [rootUrl];
 
     while (queue.length > 0) {
@@ -89,8 +95,8 @@ export class DiscoveryService {
             }
           }
         } else if (jsonObj.urlset) {
-          // This is a leaf sitemap
-          yield currentUrl;
+          // This is a leaf sitemap - yield both URL and XML data
+          yield { url: currentUrl, xmlData };
         }
       } catch (error) {
         console.error(`Failed to fetch or parse sitemap at ${currentUrl}:`, error);
