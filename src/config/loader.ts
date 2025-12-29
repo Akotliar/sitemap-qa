@@ -10,7 +10,12 @@ export class ConfigLoader {
 
   static load(configPath?: string): Config {
     const targetPath = configPath || path.join(process.cwd(), this.DEFAULT_CONFIG_PATH);
-    let userConfig: Config = { policies: [] };
+    let userConfig: Config = {
+      acceptable_patterns: [],
+      policies: [],
+      outputFormat: 'all',
+      enforceDomainConsistency: true,
+    };
 
     // Load YAML config
     if (fs.existsSync(targetPath)) {
