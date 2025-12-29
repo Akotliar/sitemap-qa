@@ -1,6 +1,6 @@
 {
   "name": "@akotliar/sitemap-qa",
-  "version": "1.0.0-alpha.4",
+  "version": "1.0.0-alpha.5",
   "description": "Detect test/qa/dev/staging URLs, admin paths, sensitive parameters, and URLs that shouldn't be publicly indexed.",
   "type": "module",
   "main": "./dist/index.js",
