@@ -282,7 +282,11 @@ export class HtmlReporter implements Reporter {
                         ? ` <span style="color: var(--danger); font-size: 11px; font-weight: bold;">[Suppressed Risks: ${[...new Set(u.risks.map(r => r.category))].map(esc).join(', ')}]</span>`
                         : '';
 
-                    const ignoredBy = u.ignoredBy ?? 'Unknown';
+                    // When showing ignored URLs, if they have suppressed risks, show the risk categories
+                    // instead of the acceptable pattern reason
+                    const ignoredBy = u.risks.length > 0 
+                        ? [...new Set(u.risks.map(r => r.category))].join(', ')
+                        : (u.ignoredBy ?? 'Unknown');
                     return `<div class="url-item" title="Ignored by: ${esc(ignoredBy)}">${esc(u.loc)} <span style="color: var(--text-muted); font-size: 11px;">(by ${esc(ignoredBy)})</span>${suppressedRisks}</div>`;
                 }).join('')}
             </div>
