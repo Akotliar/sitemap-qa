@@ -278,15 +278,17 @@ export class HtmlReporter implements Reporter {
             <summary>Ignored URLs (${data.ignoredUrls.length})</summary>
             <div style="padding: 20px; background: var(--bg-light);">
                 ${data.ignoredUrls.map(u => {
-                    const suppressedRisks = u.risks.length > 0 
-                        ? ` <span style="color: var(--danger); font-size: 11px; font-weight: bold;">[Suppressed Risks: ${[...new Set(u.risks.map(r => r.category))].map(esc).join(', ')}]</span>`
+                    const riskCategories = u.risks.length > 0 
+                        ? [...new Set(u.risks.map(r => r.category))].join(', ')
+                        : '';
+                    
+                    const suppressedRisks = riskCategories
+                        ? ` <span style="color: var(--danger); font-size: 11px; font-weight: bold;">[Suppressed Risks: ${esc(riskCategories)}]</span>`
                         : '';
 
                     // When showing ignored URLs, if they have suppressed risks, show the risk categories
                     // instead of the acceptable pattern reason
-                    const ignoredBy = u.risks.length > 0 
-                        ? [...new Set(u.risks.map(r => r.category))].join(', ')
-                        : (u.ignoredBy ?? 'Unknown');
+                    const ignoredBy = riskCategories || u.ignoredBy || 'Unknown';
                     return `<div class="url-item" title="Ignored by: ${esc(ignoredBy)}">${esc(u.loc)} <span style="color: var(--text-muted); font-size: 11px;">(by ${esc(ignoredBy)})</span>${suppressedRisks}</div>`;
                 }).join('')}
             </div>

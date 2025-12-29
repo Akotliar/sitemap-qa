@@ -4,9 +4,11 @@ import { ReportData } from '../src/reporters/base';
 import { SitemapUrl } from '../src/types/sitemap';
 import fs from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 describe('HtmlReporter', () => {
-  const testOutputPath = '/tmp/test-html-report.html';
+  const testOutputPath = path.join(os.tmpdir(), 'test-html-report.html');
 
   afterEach(async () => {
     if (existsSync(testOutputPath)) {
