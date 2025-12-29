@@ -143,7 +143,38 @@ The HTML report provides an interactive, visually appealing view with:
 
 ## 🛠️ CLI Commands
 
-Sitemap-QA provides two main commands: `analyze` and `init`.
+Sitemap-QA provides two main commands: `init` and `analyze`.
+
+
+### init Command
+
+Initialize a default `sitemap-qa.yaml` configuration file in the current directory.
+
+```
+Usage: sitemap-qa init [options]
+
+Initialize a default sitemap-qa.yaml configuration file
+
+Options:
+  -h, --help                   Display help for command
+```
+
+#### Example
+
+```bash
+# Create a default configuration file
+sitemap-qa init
+
+# This creates sitemap-qa.yaml with:
+# - Default risk policies (Security & Admin, Environment Leakage, Sensitive Files)
+# - Example acceptable patterns
+# - Default output settings
+```
+
+**Note:** The `init` command will fail if `sitemap-qa.yaml` already exists in the current directory to prevent accidental overwrites.
+
+---
+
 
 ### analyze Command
 
@@ -185,35 +216,6 @@ sitemap-qa analyze https://example.com --config ./custom-config.yaml
 # Combine options
 sitemap-qa analyze https://example.com --config ./custom-config.yaml --output json --out-dir ./reports
 ```
-
-### init Command
-
-Initialize a default `sitemap-qa.yaml` configuration file in the current directory.
-
-```
-Usage: sitemap-qa init [options]
-
-Initialize a default sitemap-qa.yaml configuration file
-
-Options:
-  -h, --help                   Display help for command
-```
-
-#### Example
-
-```bash
-# Create a default configuration file
-sitemap-qa init
-
-# This creates sitemap-qa.yaml with:
-# - Default risk policies (Security & Admin, Environment Leakage, Sensitive Files)
-# - Example acceptable patterns
-# - Default output settings
-```
-
-**Note:** The `init` command will fail if `sitemap-qa.yaml` already exists in the current directory to prevent accidental overwrites.
-
----
 
 ## 🔧 Configuration
 
