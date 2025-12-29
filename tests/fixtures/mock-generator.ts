@@ -2,7 +2,7 @@
  * Utility to generate mock sitemaps for performance testing
  */
 
-import type { UrlEntry } from '@/core/parser';
+import type { SitemapUrl } from '@/types/sitemap';
 
 export interface MockSitemapData {
   url: string;
@@ -61,8 +61,8 @@ export function generateMockSitemaps(sitemapCount: number, urlsPerSitemap: numbe
  * Generate array of mock URL entries for testing
  * Useful for risk detection and other URL processing tests
  */
-export function generateMockUrls(count: number): UrlEntry[] {
-  const urls: UrlEntry[] = [];
+export function generateMockUrls(count: number): SitemapUrl[] {
+  const urls: SitemapUrl[] = [];
   
   for (let i = 0; i < count; i++) {
     const urlIndex = i % 10; // Create some variety in URLs
@@ -85,8 +85,9 @@ export function generateMockUrls(count: number): UrlEntry[] {
       loc,
       lastmod: '2025-12-12',
       changefreq: 'weekly',
-      priority: 0.5,
-      source: 'https://example.com/sitemap.xml'
+      priority: '0.5',
+      source: 'https://example.com/sitemap.xml',
+      risks: []
     });
   }
   
