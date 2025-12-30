@@ -434,5 +434,38 @@ Sitemap: https://example.com/sitemap2.xml`;
       expect(locs).toContain('https://example.com/page2');
       expect(locs).toContain('https://example.com/page3');
     });
+
+    it('should handle invalid URLs in normalizeUrl', async () => {
+      const sitemapXml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>invalid-url</loc></url>
+</urlset>`;
+
+      vi.mocked(fetch).mockResolvedValue({
+        status: 200,
+        text: async () => sitemapXml,
+      } as any);
+
+      const urls = [];
+      for await (const url of extractor.extract('https://example.com/sitemap.xml')) {
+        urls.push(url);
+      }
+
+      expect(urls).toHaveLength(1);
+      expect(urls[0].loc).toBe('invalid-url');
+    });
+
+    it('should handle fetch errors during extraction', async () => {
+      vi.mocked(fetch).mockRejectedValue(new Error('Network error'));
+
+      const urls = [];
+      try {
+        for await (const url of extractor.extract('https://example.com/sitemap.xml')) {
+          urls.push(url);
+        }
+      } catch (e) {
+        // Expected
+      }
+    });
   });
 });

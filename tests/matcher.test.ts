@@ -244,5 +244,54 @@ describe('MatcherService', () => {
       const risks = matcher.match(urlObj);
       expect(risks).toHaveLength(0);
     });
+
+    it('should handle invalid regex patterns', () => {
+      const config: Config = {
+        acceptable_patterns: [],
+        enforceDomainConsistency: true,
+        policies: [
+          {
+            category: 'Test',
+            patterns: [{ type: 'regex', value: '[', reason: 'Invalid regex' }]
+          }
+        ],
+        outputFormat: 'all'
+      };
+      const matcher = new MatcherService(config);
+      const urlObj: SitemapUrl = { loc: 'https://example.com', source: 's', risks: [] };
+      
+      expect(matcher.match(urlObj)).toHaveLength(0);
+    });
+
+    it('should handle unknown pattern types', () => {
+      const config: Config = {
+        acceptable_patterns: [],
+        enforceDomainConsistency: true,
+        policies: [
+          {
+            category: 'Test',
+            patterns: [{ type: 'unknown' as any, value: 'v', reason: 'r' }]
+          }
+        ],
+        outputFormat: 'all'
+      };
+      const matcher = new MatcherService(config);
+      const urlObj: SitemapUrl = { loc: 'https://example.com', source: 's', risks: [] };
+      
+      expect(matcher.match(urlObj)).toHaveLength(0);
+    });
+
+    it('should handle invalid URLs in domain consistency check', () => {
+      const config: Config = {
+        acceptable_patterns: [],
+        policies: [],
+        outputFormat: 'all',
+        enforceDomainConsistency: true
+      };
+      const matcher = new MatcherService(config, 'https://example.com');
+      const urlObj: SitemapUrl = { loc: 'invalid-url', source: 's', risks: [] };
+      
+      expect(matcher.match(urlObj)).toHaveLength(0);
+    });
   });
 });
