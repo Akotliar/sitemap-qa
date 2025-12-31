@@ -318,17 +318,6 @@ describe('ExtractorService', () => {
       expect(urls).toHaveLength(0);
     });
 
-    it('should handle fetch errors gracefully', async () => {
-      vi.mocked(fetch).mockRejectedValue(new Error('Network error'));
-
-      const urls = [];
-      for await (const url of extractor.extract('https://example.com/sitemap.xml')) {
-        urls.push(url);
-      }
-
-      expect(urls).toHaveLength(0);
-    });
-
     it('should track multiple discovered sitemaps from discovery', async () => {
       const robotsContent = `Sitemap: https://example.com/sitemap1.xml
 Sitemap: https://example.com/sitemap2.xml`;
@@ -456,16 +445,28 @@ Sitemap: https://example.com/sitemap2.xml`;
     });
 
     it('should handle fetch errors during extraction', async () => {
+      // Mock console.error to verify error logging
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
       vi.mocked(fetch).mockRejectedValue(new Error('Network error'));
 
       const urls = [];
-      try {
-        for await (const url of extractor.extract('https://example.com/sitemap.xml')) {
-          urls.push(url);
-        }
-      } catch (e) {
-        // Expected
+      // The generator should complete gracefully without throwing
+      for await (const url of extractor.extract('https://example.com/sitemap.xml')) {
+        urls.push(url);
       }
+
+      // Verify no URLs were extracted when fetch fails
+      expect(urls).toHaveLength(0);
+      
+      // Verify the error was logged
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to fetch or parse sitemap'),
+        expect.any(Error)
+      );
+      
+      consoleErrorSpy.mockRestore();
     });
   });
 });
