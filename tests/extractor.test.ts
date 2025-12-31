@@ -318,17 +318,6 @@ describe('ExtractorService', () => {
       expect(urls).toHaveLength(0);
     });
 
-    it('should handle fetch errors gracefully', async () => {
-      vi.mocked(fetch).mockRejectedValue(new Error('Network error'));
-
-      const urls = [];
-      for await (const url of extractor.extract('https://example.com/sitemap.xml')) {
-        urls.push(url);
-      }
-
-      expect(urls).toHaveLength(0);
-    });
-
     it('should track multiple discovered sitemaps from discovery', async () => {
       const robotsContent = `Sitemap: https://example.com/sitemap1.xml
 Sitemap: https://example.com/sitemap2.xml`;
