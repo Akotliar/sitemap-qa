@@ -34,11 +34,10 @@ describe('SitemapParser', () => {
     expect(fetch).toHaveBeenCalledWith('https://example.com/sitemap.xml');
   });
 
-  it('should handle parsing errors gracefully', async () => {
+  it('should handle fetch errors gracefully', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     
-    // Invalid XML that will cause fast-xml-parser to throw or return something unexpected
-    // Actually fast-xml-parser is quite lenient, but we can force an error by making fetch throw
+    // Simulate a fetch error to test error handling in the legacy path
     vi.mocked(fetch).mockRejectedValue(new Error('Fetch failed'));
 
     const urls = [];
@@ -50,5 +49,22 @@ describe('SitemapParser', () => {
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Failed to parse sitemap'), expect.any(Error));
     
     consoleSpy.mockRestore();
+  });
+
+  it('should handle unexpected XML structure gracefully', async () => {
+    // fast-xml-parser is quite lenient, so we test that the parser
+    // handles XML without the expected urlset structure gracefully
+    const unexpectedXml = '<root><item>Not a sitemap</item></root>';
+    
+    const urls = [];
+    for await (const url of parser.parse({ 
+      url: 'https://example.com/sitemap.xml',
+      xmlData: unexpectedXml 
+    })) {
+      urls.push(url);
+    }
+
+    // Should yield no URLs when the XML doesn't have urlset structure
+    expect(urls).toHaveLength(0);
   });
 });
