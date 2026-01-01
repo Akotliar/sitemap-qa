@@ -424,7 +424,7 @@ Sitemap: https://example.com/sitemap2.xml`;
       expect(locs).toContain('https://example.com/page3');
     });
 
-    it('should handle invalid URLs in normalizeUrl', async () => {
+    it('should pass through invalid URLs without normalization', async () => {
       const sitemapXml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>invalid-url</loc></url>
