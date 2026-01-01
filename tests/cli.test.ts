@@ -125,7 +125,7 @@ describe('CLI Commands', () => {
     beforeEach(() => {
       vi.mocked(ConfigLoader.load).mockReturnValue(mockConfig as any);
       vi.mocked(ExtractorService.prototype.extract).mockImplementation(async function* () {
-        yield { loc: 'https://example.com/page1', risks: [], source: 'sitemap.xml' };
+        yield { loc: 'https://cli-test1.local/page1', risks: [], source: 'sitemap.xml' };
       });
       vi.mocked(MatcherService.prototype.match).mockReturnValue([]);
       vi.mocked(ExtractorService.prototype.getDiscoveredSitemaps).mockReturnValue(['sitemap.xml']);
@@ -135,7 +135,7 @@ describe('CLI Commands', () => {
     });
 
     it('should run analysis successfully when no risks are found', async () => {
-      await analyzeCommand.parseAsync(['node', 'test', 'analyze', 'https://example.com/sitemap.xml']);
+      await analyzeCommand.parseAsync(['node', 'test', 'analyze', 'https://cli-test1.local/sitemap.xml']);
 
       expect(ConfigLoader.load).toHaveBeenCalled();
       expect(errorSpy).not.toHaveBeenCalled();
@@ -163,7 +163,7 @@ describe('CLI Commands', () => {
       vi.mocked(ExtractorService.prototype.extract).mockImplementation(async function* () {
         for (let i = 1; i <= 100; i++) {
           yield { 
-            loc: `https://example.com/page${i}`, 
+            loc: `https://cli-test2.local/page${i}`, 
             risks: [], 
             source: 'sitemap.xml',
             ignored: i === 1,
@@ -174,7 +174,7 @@ describe('CLI Commands', () => {
 
       const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
 
-      await analyzeCommand.parseAsync(['node', 'test', 'analyze', 'https://example.com/sitemap.xml']);
+      await analyzeCommand.parseAsync(['node', 'test', 'analyze', 'https://cli-test2.local/sitemap.xml']);
 
       expect(stdoutSpy).toHaveBeenCalledWith(expect.stringContaining('Processed 100 URLs'));
       expect(exitSpy).toHaveBeenCalledWith(0);
@@ -187,7 +187,7 @@ describe('CLI Commands', () => {
         { category: 'Security', pattern: '**/admin/**', reason: 'Sensitive', type: "glob" }
       ]);
 
-      await analyzeCommand.parseAsync(['node', 'test', 'analyze', 'https://example.com/sitemap.xml']);
+      await analyzeCommand.parseAsync(['node', 'test', 'analyze', 'https://cli-test3.local/sitemap.xml']);
 
       expect(exitSpy).toHaveBeenCalledWith(1);
     });
@@ -197,7 +197,7 @@ describe('CLI Commands', () => {
         throw new Error('Extraction failed');
       });
 
-      await analyzeCommand.parseAsync(['node', 'test', 'analyze', 'https://example.com/sitemap.xml']);
+      await analyzeCommand.parseAsync(['node', 'test', 'analyze', 'https://cli-test4.local/sitemap.xml']);
 
       expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Analysis failed:'), expect.any(Error));
       expect(exitSpy).toHaveBeenCalledWith(1);
@@ -205,7 +205,7 @@ describe('CLI Commands', () => {
 
     it('should respect CLI options', async () => {
       await analyzeCommand.parseAsync([
-        'node', 'test', 'analyze', 'https://example.com/sitemap.xml',
+        'node', 'test', 'analyze', 'https://cli-test5.local/sitemap.xml',
         '--config', 'custom-config.yaml',
         '--output', 'json',
         '--out-dir', './custom-out'

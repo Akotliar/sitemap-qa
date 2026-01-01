@@ -47,7 +47,7 @@ describe('MatcherService', () => {
 
   it('should mark URL as ignored if it matches an acceptable literal pattern', () => {
     const urlObj: SitemapUrl = {
-      loc: 'https://example.com/acceptable-path',
+      loc: 'https://matcher-test1.local/acceptable-path',
       source: 'sitemap.xml',
       risks: []
     };
@@ -61,7 +61,7 @@ describe('MatcherService', () => {
 
   it('should mark URL as ignored if it matches an acceptable glob pattern', () => {
     const urlObj: SitemapUrl = {
-      loc: 'https://example.com/some/safe/path',
+      loc: 'https://matcher-test2.local/some/safe/path',
       source: 'sitemap.xml',
       risks: []
     };
@@ -75,7 +75,7 @@ describe('MatcherService', () => {
 
   it('should mark URL as ignored if it matches an acceptable regex pattern', () => {
     const urlObj: SitemapUrl = {
-      loc: 'https://example.com/regex-safe-123',
+      loc: 'https://matcher-test3.local/regex-safe-123',
       source: 'sitemap.xml',
       risks: []
     };
@@ -90,7 +90,7 @@ describe('MatcherService', () => {
   it('should prioritize acceptable patterns over risk patterns', () => {
     // This URL matches both an acceptable pattern and a risk pattern
     const urlObj: SitemapUrl = {
-      loc: 'https://example.com/safe/risky/path',
+      loc: 'https://matcher-test4.local/safe/risky/path',
       source: 'sitemap.xml',
       risks: []
     };
@@ -109,7 +109,7 @@ describe('MatcherService', () => {
       ...mockConfig,
       enforceDomainConsistency: true
     };
-    const matcher = new MatcherService(config, 'https://example.com');
+    const matcher = new MatcherService(config, 'https://matcher-test5.local');
     const urlObj: SitemapUrl = {
       loc: 'https://other-domain.com/acceptable-path',
       source: 'sitemap.xml',
@@ -135,7 +135,7 @@ describe('MatcherService', () => {
         ...mockConfig,
         enforceDomainConsistency: true
       };
-      const matcher = new MatcherService(config, 'https://example.com');
+      const matcher = new MatcherService(config, 'https://matcher-test6.local');
       const urlObj: SitemapUrl = {
         loc: 'https://other-domain.com/acceptable-path',
         source: 'sitemap.xml',
@@ -166,7 +166,7 @@ describe('MatcherService', () => {
 
   it('should return risks if URL does not match any acceptable pattern', () => {
     const urlObj: SitemapUrl = {
-      loc: 'https://example.com/admin/dashboard',
+      loc: 'https://matcher-test7.local/admin/dashboard',
       source: 'sitemap.xml',
       risks: []
     };
@@ -186,7 +186,7 @@ describe('MatcherService', () => {
         outputFormat: 'all',
         enforceDomainConsistency: true
       };
-      const matcher = new MatcherService(config, 'https://example.com');
+      const matcher = new MatcherService(config, 'https://matcher-test8.local');
       const urlObj: SitemapUrl = {
         loc: 'https://other-domain.com/page',
         source: 'sitemap.xml',
@@ -197,7 +197,7 @@ describe('MatcherService', () => {
 
       expect(risks).toHaveLength(1);
       expect(risks[0].category).toBe('Domain Consistency');
-      expect(risks[0].reason).toContain('expected example.com');
+      expect(risks[0].reason).toContain('expected matcher-test8.local');
     });
 
     it('should NOT flag domain mismatch if domains match (ignoring www.)', () => {
@@ -209,18 +209,18 @@ describe('MatcherService', () => {
       };
       
       // Case 1: Root has www, URL doesn't
-      const matcher1 = new MatcherService(config, 'https://www.example.com');
+      const matcher1 = new MatcherService(config, 'https://www.matcher-test9.local');
       const urlObj1: SitemapUrl = {
-        loc: 'https://example.com/page',
+        loc: 'https://matcher-test9.local/page',
         source: 'sitemap.xml',
         risks: []
       };
       expect(matcher1.match(urlObj1)).toHaveLength(0);
 
       // Case 2: Root doesn't have www, URL does
-      const matcher2 = new MatcherService(config, 'https://example.com');
+      const matcher2 = new MatcherService(config, 'https://matcher-test9.local');
       const urlObj2: SitemapUrl = {
-        loc: 'https://www.example.com/page',
+        loc: 'https://www.matcher-test9.local/page',
         source: 'sitemap.xml',
         risks: []
       };
@@ -234,7 +234,7 @@ describe('MatcherService', () => {
         outputFormat: 'all',
         enforceDomainConsistency: false
       };
-      const matcher = new MatcherService(config, 'https://example.com');
+      const matcher = new MatcherService(config, 'https://matcher-test10.local');
       const urlObj: SitemapUrl = {
         loc: 'https://other-domain.com/page',
         source: 'sitemap.xml',
@@ -258,7 +258,7 @@ describe('MatcherService', () => {
         outputFormat: 'all'
       };
       const matcher = new MatcherService(config);
-      const urlObj: SitemapUrl = { loc: 'https://example.com', source: 's', risks: [] };
+      const urlObj: SitemapUrl = { loc: 'https://matcher-test11.local', source: 's', risks: [] };
       
       expect(matcher.match(urlObj)).toHaveLength(0);
     });
@@ -276,7 +276,7 @@ describe('MatcherService', () => {
         outputFormat: 'all'
       };
       const matcher = new MatcherService(config);
-      const urlObj: SitemapUrl = { loc: 'https://example.com', source: 's', risks: [] };
+      const urlObj: SitemapUrl = { loc: 'https://matcher-test12.local', source: 's', risks: [] };
       
       expect(matcher.match(urlObj)).toHaveLength(0);
     });
@@ -288,7 +288,7 @@ describe('MatcherService', () => {
         outputFormat: 'all',
         enforceDomainConsistency: true
       };
-      const matcher = new MatcherService(config, 'https://example.com');
+      const matcher = new MatcherService(config, 'https://matcher-test13.local');
       const urlObj: SitemapUrl = { loc: 'invalid-url', source: 's', risks: [] };
       
       expect(matcher.match(urlObj)).toHaveLength(0);
