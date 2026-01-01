@@ -31,7 +31,7 @@ vi.mock('../src/config/defaults', () => ({
 describe('ConfigLoader', () => {
   const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {
     throw new Error('EXIT_CALLED');
-  }) as any);
+  }) as never);
   const errorSpy = vi.fn();
 
   beforeEach(() => {
