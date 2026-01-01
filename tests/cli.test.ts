@@ -2,9 +2,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { initCommand } from '../src/commands/init';
 import { analyzeCommand } from '../src/commands/analyze';
 import fs from 'node:fs';
+import fsPromises from 'node:fs/promises';
 import { ConfigLoader } from '../src/config/loader';
 import { ExtractorService } from '../src/core/extractor';
 import { MatcherService } from '../src/core/matcher';
+
+// Create mock generate function at module level
+const mockGenerate = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('node:fs');
 vi.mock('node:fs/promises');
@@ -13,8 +17,13 @@ vi.mock('chalk', () => {
     red: vi.fn((s) => s),
     green: vi.fn((s) => s),
     blue: vi.fn((s) => s),
+    cyan: vi.fn((s) => s),
     gray: vi.fn((s) => s),
     yellow: vi.fn((s) => s),
+    bold: {
+      blue: vi.fn((s) => s),
+      yellow: vi.fn((s) => s),
+    },
   };
   return {
     default: m,
@@ -24,9 +33,27 @@ vi.mock('chalk', () => {
 vi.mock('../src/config/loader');
 vi.mock('../src/core/extractor');
 vi.mock('../src/core/matcher');
-vi.mock('../src/reporters/console-reporter');
-vi.mock('../src/reporters/json-reporter');
-vi.mock('../src/reporters/html-reporter');
+vi.mock('../src/reporters/console-reporter', () => ({
+  ConsoleReporter: vi.fn(function() {
+    return {
+      generate: mockGenerate,
+    };
+  }),
+}));
+vi.mock('../src/reporters/json-reporter', () => ({
+  JsonReporter: vi.fn(function() {
+    return {
+      generate: mockGenerate,
+    };
+  }),
+}));
+vi.mock('../src/reporters/html-reporter', () => ({
+  HtmlReporter: vi.fn(function() {
+    return {
+      generate: mockGenerate,
+    };
+  }),
+}));
 
 describe('CLI Commands', () => {
   const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
@@ -35,6 +62,8 @@ describe('CLI Commands', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset mockGenerate after clearAllMocks
+    mockGenerate.mockResolvedValue(undefined);
     vi.stubGlobal('console', {
       log: logSpy,
       error: errorSpy,
@@ -100,12 +129,33 @@ describe('CLI Commands', () => {
       });
       vi.mocked(MatcherService.prototype.match).mockReturnValue([]);
       vi.mocked(ExtractorService.prototype.getDiscoveredSitemaps).mockReturnValue(['sitemap.xml']);
+      
+      // Mock fs/promises.mkdir to return a resolved promise
+      vi.mocked(fsPromises.mkdir).mockResolvedValue(undefined);
     });
 
     it('should run analysis successfully when no risks are found', async () => {
       await analyzeCommand.parseAsync(['node', 'test', 'analyze', 'https://example.com/sitemap.xml']);
 
       expect(ConfigLoader.load).toHaveBeenCalled();
+      expect(errorSpy).not.toHaveBeenCalled();
+      
+      // Verify that reporters were called with the expected data structure
+      expect(mockGenerate).toHaveBeenCalled();
+      expect(mockGenerate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          totalUrls: 1,
+          totalRisks: 0,
+          urlsWithRisks: [],
+          discoveredSitemaps: ['sitemap.xml'],
+          ignoredUrls: [],
+        })
+      );
+      
+      // Verify reporter was called 3 times (console, json, html since outputFormat is 'all')
+      expect(mockGenerate).toHaveBeenCalledTimes(3);
+      
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Starting analysis'));
       expect(exitSpy).toHaveBeenCalledWith(0);
     });
 
