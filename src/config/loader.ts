@@ -31,16 +31,19 @@ export class ConfigLoader {
             console.error(chalk.yellow(`  - ${issue.path.join('.')}: ${issue.message}`));
           });
           process.exit(2);
+          return DEFAULT_POLICIES; // TypeScript safety: never reached in production
         }
 
         userConfig = result.data;
       } catch (error) {
         console.error(chalk.red('Failed to load configuration:'), error);
         process.exit(2);
+        return DEFAULT_POLICIES; // TypeScript safety: never reached in production
       }
     } else if (configPath) {
       console.error(chalk.red(`Error: Configuration file not found at ${targetPath}`));
       process.exit(2);
+      return DEFAULT_POLICIES; // TypeScript safety: never reached in production
     }
 
     return this.mergeConfigs(DEFAULT_POLICIES, userConfig);
