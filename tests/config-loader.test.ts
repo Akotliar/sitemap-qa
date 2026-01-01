@@ -29,9 +29,9 @@ vi.mock('../src/config/defaults', () => ({
 }));
 
 describe('ConfigLoader', () => {
-  const exitSpy = vi.spyOn(process, 'exit').mockImplementation((code) => {
-    throw new Error(`Process exited with code ${code}`);
-  });
+  const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {
+    throw new Error('EXIT_CALLED');
+  }) as never);
   const errorSpy = vi.fn();
 
   beforeEach(() => {
@@ -136,8 +136,8 @@ describe('ConfigLoader', () => {
 
     try {
       ConfigLoader.load('sitemap-qa.yaml');
-    } catch (e) {
-      // Expected to throw due to mocked process.exit
+    } catch (error) {
+      // Expected to throw due to process.exit mock
     }
 
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Configuration Validation Error:'));
@@ -149,8 +149,8 @@ describe('ConfigLoader', () => {
 
     try {
       ConfigLoader.load('non-existent.yaml');
-    } catch (e) {
-      // Expected to throw due to mocked process.exit
+    } catch (error) {
+      // Expected to throw due to process.exit mock
     }
 
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Configuration file not found'));
@@ -165,8 +165,8 @@ describe('ConfigLoader', () => {
 
     try {
       ConfigLoader.load('sitemap-qa.yaml');
-    } catch (e) {
-      // Expected to throw due to mocked process.exit
+    } catch (error) {
+      // Expected to throw due to process.exit mock
     }
 
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Failed to load configuration:'), expect.any(Error));
