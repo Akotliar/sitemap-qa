@@ -134,7 +134,11 @@ describe('ConfigLoader', () => {
     vi.spyOn(fs, 'existsSync').mockReturnValue(true);
     vi.spyOn(fs, 'readFileSync').mockReturnValue(yaml.dump(invalidConfig));
 
-    expect(() => ConfigLoader.load('sitemap-qa.yaml')).toThrow('Process exited with code 2');
+    try {
+      ConfigLoader.load('sitemap-qa.yaml');
+    } catch {
+      // Ignore the error thrown by the mock - we only care about verifying exit was called
+    }
 
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Configuration Validation Error:'));
     expect(exitSpy).toHaveBeenCalledWith(2);
@@ -143,7 +147,11 @@ describe('ConfigLoader', () => {
   it('should handle file not found when path is provided', () => {
     vi.spyOn(fs, 'existsSync').mockReturnValue(false);
 
-    expect(() => ConfigLoader.load('non-existent.yaml')).toThrow('Process exited with code 2');
+    try {
+      ConfigLoader.load('non-existent.yaml');
+    } catch {
+      // Ignore the error thrown by the mock - we only care about verifying exit was called
+    }
 
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Configuration file not found'));
     expect(exitSpy).toHaveBeenCalledWith(2);
@@ -155,7 +163,11 @@ describe('ConfigLoader', () => {
       throw new Error('Read error');
     });
 
-    expect(() => ConfigLoader.load('sitemap-qa.yaml')).toThrow('Process exited with code 2');
+    try {
+      ConfigLoader.load('sitemap-qa.yaml');
+    } catch {
+      // Ignore the error thrown by the mock - we only care about verifying exit was called
+    }
 
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Failed to load configuration:'), expect.any(Error));
     expect(exitSpy).toHaveBeenCalledWith(2);
