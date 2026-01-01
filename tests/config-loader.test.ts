@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ConfigLoader } from '../src/config/loader';
 import fs from 'node:fs';
 import yaml from 'js-yaml';
@@ -29,8 +29,20 @@ vi.mock('../src/config/defaults', () => ({
 }));
 
 describe('ConfigLoader', () => {
+  const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+  const errorSpy = vi.fn();
+
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal('console', {
+      error: errorSpy,
+      log: vi.fn(),
+      warn: vi.fn(),
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('should merge acceptable_patterns from user config with defaults', () => {
@@ -103,5 +115,80 @@ describe('ConfigLoader', () => {
     const config = ConfigLoader.load('sitemap-qa.yaml');
 
     expect(config.outputFormat).toBe('json');
+  });
+
+  it('should handle validation errors', () => {
+    const invalidConfig = {
+      policies: [
+        {
+          category: 'Security',
+          patterns: [
+            { type: 'invalid-type', value: '/admin' } // Missing reason and invalid type
+          ]
+        }
+      ]
+    };
+
+    vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(yaml.dump(invalidConfig));
+
+    ConfigLoader.load('sitemap-qa.yaml');
+
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Configuration Validation Error:'));
+    expect(exitSpy).toHaveBeenCalledWith(2);
+  });
+
+  it('should handle file not found when path is provided', () => {
+    vi.spyOn(fs, 'existsSync').mockReturnValue(false);
+
+    ConfigLoader.load('non-existent.yaml');
+
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Configuration file not found'));
+    expect(exitSpy).toHaveBeenCalledWith(2);
+  });
+
+  it('should handle read errors', () => {
+    vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+    vi.spyOn(fs, 'readFileSync').mockImplementation(() => {
+      throw new Error('Read error');
+    });
+
+    ConfigLoader.load('sitemap-qa.yaml');
+
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Failed to load configuration:'), expect.any(Error));
+    expect(exitSpy).toHaveBeenCalledWith(2);
+  });
+
+  it('should add new user categories during merge', () => {
+    const mockUserConfig = {
+      policies: [
+        {
+          category: 'New Category',
+          patterns: [{ type: 'literal', value: '/new', reason: 'r' }]
+        }
+      ]
+    };
+
+    vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(yaml.dump(mockUserConfig));
+
+    const config = ConfigLoader.load('sitemap-qa.yaml');
+
+    expect(config.policies).toHaveLength(2); // Default Security + New Category
+    expect(config.policies.find(p => p.category === 'New Category')).toBeDefined();
+  });
+
+  it('should merge outDir from user config', () => {
+    const mockUserConfig = {
+      outDir: './custom-out',
+      policies: []
+    };
+
+    vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(yaml.dump(mockUserConfig));
+
+    const config = ConfigLoader.load('sitemap-qa.yaml');
+
+    expect(config.outDir).toBe('./custom-out');
   });
 });

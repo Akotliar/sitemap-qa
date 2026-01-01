@@ -318,17 +318,6 @@ describe('ExtractorService', () => {
       expect(urls).toHaveLength(0);
     });
 
-    it('should handle fetch errors gracefully', async () => {
-      vi.mocked(fetch).mockRejectedValue(new Error('Network error'));
-
-      const urls = [];
-      for await (const url of extractor.extract('https://example.com/sitemap.xml')) {
-        urls.push(url);
-      }
-
-      expect(urls).toHaveLength(0);
-    });
-
     it('should track multiple discovered sitemaps from discovery', async () => {
       const robotsContent = `Sitemap: https://example.com/sitemap1.xml
 Sitemap: https://example.com/sitemap2.xml`;
@@ -433,6 +422,51 @@ Sitemap: https://example.com/sitemap2.xml`;
       expect(locs).toContain('https://example.com/page1');
       expect(locs).toContain('https://example.com/page2');
       expect(locs).toContain('https://example.com/page3');
+    });
+
+    it('should pass through invalid URLs without normalization', async () => {
+      const sitemapXml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>invalid-url</loc></url>
+</urlset>`;
+
+      vi.mocked(fetch).mockResolvedValue({
+        status: 200,
+        text: async () => sitemapXml,
+      } as any);
+
+      const urls = [];
+      for await (const url of extractor.extract('https://example.com/sitemap.xml')) {
+        urls.push(url);
+      }
+
+      expect(urls).toHaveLength(1);
+      expect(urls[0].loc).toBe('invalid-url');
+    });
+
+    it('should handle fetch errors during extraction', async () => {
+      // Mock console.error to verify error logging
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      
+      vi.mocked(fetch).mockRejectedValue(new Error('Network error'));
+
+      const urls = [];
+      // The generator should complete gracefully without throwing
+      for await (const url of extractor.extract('https://example.com/sitemap.xml')) {
+        urls.push(url);
+      }
+
+      // Verify no URLs were extracted when fetch fails
+      expect(urls).toHaveLength(0);
+      
+      // Verify the error was logged
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to fetch or parse sitemap'),
+        expect.any(Error)
+      );
+      
+      consoleErrorSpy.mockRestore();
     });
   });
 });
