@@ -12,12 +12,12 @@ export interface MockSitemapData {
 /**
  * Generate mock sitemap XML content
  */
-export function generateMockSitemapXml(urlCount: number, sitemapIndex: number): string {
+export function generateMockSitemapXml(urlCount: number, sitemapIndex: number, domain = 'test.local'): string {
   const urls: string[] = [];
   
   for (let i = 0; i < urlCount; i++) {
     urls.push(`    <url>
-      <loc>https://example.com/sitemap-${sitemapIndex}/page-${i}.html</loc>
+      <loc>https://${domain}/sitemap-${sitemapIndex}/page-${i}.html</loc>
       <lastmod>2025-12-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}</lastmod>
       <changefreq>daily</changefreq>
       <priority>${(Math.random()).toFixed(1)}</priority>
@@ -33,10 +33,10 @@ ${urls.join('\n')}
 /**
  * Generate array of mock sitemap URLs
  */
-export function generateMockSitemapUrls(count: number): string[] {
+export function generateMockSitemapUrls(count: number, domain = 'test.local'): string[] {
   const urls: string[] = [];
   for (let i = 0; i < count; i++) {
-    urls.push(`https://example.com/sitemap-${i}.xml`);
+    urls.push(`https://${domain}/sitemap-${i}.xml`);
   }
   return urls;
 }
@@ -44,13 +44,13 @@ export function generateMockSitemapUrls(count: number): string[] {
 /**
  * Generate array of mock sitemaps with content
  */
-export function generateMockSitemaps(sitemapCount: number, urlsPerSitemap: number): MockSitemapData[] {
+export function generateMockSitemaps(sitemapCount: number, urlsPerSitemap: number, domain = 'test.local'): MockSitemapData[] {
   const sitemaps: MockSitemapData[] = [];
   
   for (let i = 0; i < sitemapCount; i++) {
     sitemaps.push({
-      url: `https://example.com/sitemap-${i}.xml`,
-      content: generateMockSitemapXml(urlsPerSitemap, i),
+      url: `https://${domain}/sitemap-${i}.xml`,
+      content: generateMockSitemapXml(urlsPerSitemap, i, domain),
     });
   }
   
@@ -61,7 +61,7 @@ export function generateMockSitemaps(sitemapCount: number, urlsPerSitemap: numbe
  * Generate array of mock URL entries for testing
  * Useful for risk detection and other URL processing tests
  */
-export function generateMockUrls(count: number): SitemapUrl[] {
+export function generateMockUrls(count: number, domain = 'test.local'): SitemapUrl[] {
   const urls: SitemapUrl[] = [];
   
   for (let i = 0; i < count; i++) {
@@ -70,15 +70,15 @@ export function generateMockUrls(count: number): SitemapUrl[] {
     // Mix of different URL patterns
     let loc: string;
     if (urlIndex === 0) {
-      loc = `https://example.com/admin/page-${i}.html`;
+      loc = `https://${domain}/admin/page-${i}.html`;
     } else if (urlIndex === 1) {
-      loc = `https://example.com/staging/page-${i}.html`;
+      loc = `https://${domain}/staging/page-${i}.html`;
     } else if (urlIndex === 2) {
-      loc = `http://example.com/page-${i}.html`; // HTTP (protocol issue)
+      loc = `http://${domain}/page-${i}.html`; // HTTP (protocol issue)
     } else if (urlIndex === 3) {
-      loc = `https://example.com/api/users/${i}?token=secret123`;
+      loc = `https://${domain}/api/users/${i}?token=secret123`;
     } else {
-      loc = `https://example.com/page-${i}.html`;
+      loc = `https://${domain}/page-${i}.html`;
     }
     
     urls.push({
@@ -86,7 +86,7 @@ export function generateMockUrls(count: number): SitemapUrl[] {
       lastmod: '2025-12-12',
       changefreq: 'weekly',
       priority: '0.5',
-      source: 'https://example.com/sitemap.xml',
+      source: `https://${domain}/sitemap.xml`,
       risks: []
     });
   }

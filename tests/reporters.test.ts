@@ -26,22 +26,23 @@ vi.mock('chalk', () => {
 });
 
 describe('Reporters', () => {
+  const testDomain = 'reporters-test.local';
   const logSpy = vi.fn();
   const mockData: ReportData = {
-    rootUrl: 'https://example.com/sitemap.xml',
-    discoveredSitemaps: ['https://example.com/sitemap.xml'],
+    rootUrl: `https://${testDomain}/sitemap.xml`,
+    discoveredSitemaps: [`https://${testDomain}/sitemap.xml`],
     totalUrls: 100,
     totalRisks: 2,
     urlsWithRisks: [
       {
-        loc: 'https://example.com/admin',
+        loc: `https://${testDomain}/admin`,
         risks: [{ category: 'Security', pattern: '**/admin/**', reason: 'Sensitive', type: "glob"  }],
         source: 'sitemap.xml'
       }
     ],
     ignoredUrls: [
       {
-        loc: 'https://example.com/ignored',
+        loc: `https://${testDomain}/ignored`,
         risks: [],
         source: 'sitemap.xml',
         ignored: true
@@ -148,7 +149,8 @@ describe('Reporters', () => {
       await reporter.generate(complexData);
 
       const call = vi.mocked(fs.writeFile).mock.calls.find(c => c[0] === 'report.html');
-      const html = call![1] as string;
+      expect(call).toBeDefined();
+      const html = call[1] as string;
       expect(html).toContain('Cat1');
       expect(html).toContain('Cat2');
       expect(html).toContain('url1');
@@ -157,11 +159,12 @@ describe('Reporters', () => {
     });
 
     it('should handle ignored URLs with suppressed risks', async () => {
+      const testDomain2 = 'reporters-test2.local';
       const dataWithSuppressed: ReportData = {
         ...mockData,
         ignoredUrls: [
           {
-            loc: 'https://example.com/ignored',
+            loc: `https://${testDomain2}/ignored`,
             risks: [{ category: 'SuppressedCat', pattern: 'p', reason: 'r', type: "literal" }],
             source: 's',
             ignored: true,
@@ -173,7 +176,8 @@ describe('Reporters', () => {
       await reporter.generate(dataWithSuppressed);
 
       const call = vi.mocked(fs.writeFile).mock.calls.find(c => c[0] === 'report.html');
-      const html = call![1] as string;
+      expect(call).toBeDefined();
+      const html = call[1] as string;
       expect(html).toContain('Suppressed Risks: SuppressedCat');
       expect(html).toContain('by Policy1');
     });
