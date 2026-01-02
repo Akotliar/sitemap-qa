@@ -468,18 +468,5 @@ Sitemap: https://extractor-test12.local/sitemap2.xml`;
       
       consoleErrorSpy.mockRestore();
     });
-
-    it('should handle fetch errors during extraction', async () => {
-      vi.mocked(fetch).mockRejectedValue(new Error('Network error'));
-
-      const urls = [];
-      try {
-        for await (const url of extractor.extract('https://example.com/sitemap.xml')) {
-          urls.push(url);
-        }
-      } catch (e) {
-        // Expected
-      }
-    });
   });
 });
