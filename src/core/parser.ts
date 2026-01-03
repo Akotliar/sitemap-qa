@@ -4,6 +4,17 @@ import { SitemapUrl } from '../types/sitemap';
 import { Readable } from 'node:stream';
 
 export class SitemapParser {
+  private readonly parser: XMLParser;
+
+  constructor() {
+    this.parser = new XMLParser({
+      ignoreAttributes: false,
+      attributeNamePrefix: "@_",
+      // Optimization: only parse what we need
+      isArray: (name) => name === 'url',
+    });
+  }
+
   /**
    * Parses a leaf sitemap and yields SitemapUrl objects.
    * Fetches or reads the full XML into memory and parses it using fast-xml-parser's XMLParser.
@@ -34,14 +45,7 @@ export class SitemapParser {
 
       const xmlData = typeof source === 'string' ? source : await this.streamToString(source);
       
-      const parser = new XMLParser({
-        ignoreAttributes: false,
-        attributeNamePrefix: "@_",
-        // Optimization: only parse what we need
-        isArray: (name) => name === 'url',
-      });
-      
-      const jsonObj = parser.parse(xmlData);
+      const jsonObj = this.parser.parse(xmlData);
 
       if (jsonObj.urlset && jsonObj.urlset.url) {
         const urls = jsonObj.urlset.url;
