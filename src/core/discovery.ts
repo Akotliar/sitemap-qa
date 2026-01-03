@@ -1,10 +1,11 @@
 import { fetch } from 'undici';
 import { XMLParser } from 'fast-xml-parser';
+import { Readable } from 'node:stream';
 
 export interface DiscoveredSitemap {
   url: string;
   xmlData: string;
-  stream?: ReadableStream;
+  stream?: ReadableStream | Readable;
 }
 
 export class DiscoveryService {

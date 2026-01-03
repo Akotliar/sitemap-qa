@@ -19,8 +19,8 @@ export class SitemapParser {
    * Parses a leaf sitemap and yields SitemapUrl objects.
    * Fetches or reads the full XML into memory and parses it using fast-xml-parser's XMLParser.
    */
-  async *parse(sitemapUrlOrData: string | { url: string; xmlData: string } | { url: string; stream: ReadableStream }): AsyncGenerator<SitemapUrl> {
-    let sitemapUrl: string;
+  async *parse(sitemapUrlOrData: string | { url: string; xmlData: string } | { url: string; stream: ReadableStream | Readable }): AsyncGenerator<SitemapUrl> {
+    let sitemapUrl: string = '';
     let source: Readable | string;
 
     try {
@@ -37,7 +37,10 @@ export class SitemapParser {
         }
       } else if ('stream' in sitemapUrlOrData) {
         sitemapUrl = sitemapUrlOrData.url;
-        source = Readable.fromWeb(sitemapUrlOrData.stream);
+        // Handle both Web ReadableStream and Node.js Readable
+        source = sitemapUrlOrData.stream instanceof Readable 
+          ? sitemapUrlOrData.stream 
+          : Readable.fromWeb(sitemapUrlOrData.stream as any);
       } else {
         sitemapUrl = sitemapUrlOrData.url;
         source = sitemapUrlOrData.xmlData;
