@@ -4,7 +4,6 @@ import { XMLParser } from 'fast-xml-parser';
 export interface DiscoveredSitemap {
   url: string;
   xmlData: string;
-  stream?: ReadableStream;
 }
 
 export class DiscoveryService {
