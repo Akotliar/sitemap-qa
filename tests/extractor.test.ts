@@ -169,10 +169,10 @@ describe('ExtractorService', () => {
       const sitemapXml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://Example.com/Page1</loc>
+    <loc>https://Extractor-Test6.local/Page1</loc>
   </url>
   <url>
-    <loc>https://EXAMPLE.COM/page1</loc>
+    <loc>https://EXTRACTOR-TEST6.LOCAL/page1</loc>
   </url>
 </urlset>`;
 
