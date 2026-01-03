@@ -6,7 +6,7 @@ import { Readable } from 'node:stream';
 export class SitemapParser {
   /**
    * Parses a leaf sitemap and yields SitemapUrl objects.
-   * Uses fast-xml-parser's XMLParser with a custom tag processor for memory-efficient streaming.
+   * Fetches or reads the full XML into memory and parses it using fast-xml-parser's XMLParser.
    */
   async *parse(sitemapUrlOrData: string | { url: string; xmlData: string } | { url: string; stream: ReadableStream }): AsyncGenerator<SitemapUrl> {
     let sitemapUrl: string;
