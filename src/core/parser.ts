@@ -19,14 +19,14 @@ export class SitemapParser {
         if (response.status !== 200) throw new Error(`Failed to fetch sitemap at ${sitemapUrl}: HTTP ${response.status}`);
         
         if (response.body) {
-          source = Readable.fromWeb(response.body as any);
+          source = Readable.fromWeb(response.body);
         } else {
           // Fallback for environments where body might be missing or mocked without body
           source = await response.text();
         }
       } else if ('stream' in sitemapUrlOrData) {
         sitemapUrl = sitemapUrlOrData.url;
-        source = Readable.fromWeb(sitemapUrlOrData.stream as any);
+        source = Readable.fromWeb(sitemapUrlOrData.stream);
       } else {
         sitemapUrl = sitemapUrlOrData.url;
         source = sitemapUrlOrData.xmlData;
