@@ -48,7 +48,8 @@ export class SitemapParser {
       const jsonObj = this.parser.parse(xmlData);
 
       if (jsonObj.urlset && jsonObj.urlset.url) {
-        const urls = jsonObj.urlset.url;
+        const rawUrls = jsonObj.urlset.url;
+        const urls = Array.isArray(rawUrls) ? rawUrls : [rawUrls];
 
         for (const url of urls) {
           if (url.loc) {
