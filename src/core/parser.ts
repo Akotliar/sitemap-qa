@@ -40,7 +40,8 @@ export class SitemapParser {
         // Handle both Web ReadableStream and Node.js Readable
         source = sitemapUrlOrData.stream instanceof Readable 
           ? sitemapUrlOrData.stream 
-          : Readable.fromWeb(sitemapUrlOrData.stream as any);
+          // @ts-expect-error - ReadableStream types from global and node:stream/web are compatible at runtime
+          : Readable.fromWeb(sitemapUrlOrData.stream);
       } else {
         sitemapUrl = sitemapUrlOrData.url;
         source = sitemapUrlOrData.xmlData;
