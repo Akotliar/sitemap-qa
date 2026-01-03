@@ -29,7 +29,9 @@ export class SitemapParser {
    *     Use this when you have a stream source (e.g., from a streaming HTTP response)
    *     that should be consumed and parsed.
    * 
-   * @yields {SitemapUrl} Parsed sitemap URL entries with location, metadata, and source information.
+   * @yields {SitemapUrl} Parsed sitemap URL entries containing `loc` (URL), `source` (sitemap URL),
+   *   optional metadata (`lastmod`, `changefreq`, `priority`), an empty `risks` array,
+   *   and optional `ignored`/`ignoredBy` properties.
    */
   async *parse(sitemapUrlOrData: string | { url: string; xmlData: string } | { url: string; stream: ReadableStream }): AsyncGenerator<SitemapUrl> {
     let sitemapUrl: string;
