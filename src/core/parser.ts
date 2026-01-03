@@ -20,12 +20,15 @@ export class SitemapParser {
    * Fetches or reads the full XML into memory and parses it using fast-xml-parser's XMLParser.
    */
   async *parse(sitemapUrlOrData: string | { url: string; xmlData: string } | { url: string; stream: ReadableStream }): AsyncGenerator<SitemapUrl> {
-    let sitemapUrl: string;
+    // Extract URL first so it's available in catch block
+    const sitemapUrl = typeof sitemapUrlOrData === 'string' 
+      ? sitemapUrlOrData 
+      : sitemapUrlOrData.url;
+    
     let source: Readable | string;
 
     try {
       if (typeof sitemapUrlOrData === 'string') {
-        sitemapUrl = sitemapUrlOrData;
         const response = await fetch(sitemapUrl);
         if (response.status !== 200) throw new Error(`Failed to fetch sitemap at ${sitemapUrl}: HTTP ${response.status}`);
         
@@ -36,10 +39,8 @@ export class SitemapParser {
           source = await response.text();
         }
       } else if ('stream' in sitemapUrlOrData) {
-        sitemapUrl = sitemapUrlOrData.url;
         source = Readable.fromWeb(sitemapUrlOrData.stream);
       } else {
-        sitemapUrl = sitemapUrlOrData.url;
         source = sitemapUrlOrData.xmlData;
       }
 
