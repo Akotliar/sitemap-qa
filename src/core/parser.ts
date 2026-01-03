@@ -30,8 +30,9 @@ export class SitemapParser {
    *     that should be consumed and parsed.
    * 
    * @yields {SitemapUrl} Parsed sitemap URL entries containing `loc` (URL), `source` (sitemap URL),
-   *   optional metadata (`lastmod`, `changefreq`, `priority`), a `risks` array (initialized as empty,
-   *   populated later in the processing pipeline), and optional `ignored`/`ignoredBy` properties.
+   *   optional metadata (`lastmod`, `changefreq`, `priority`), and a `risks` array (initialized as empty,
+   *   populated later in the processing pipeline). Other properties like `ignored`/`ignoredBy` are not
+   *   set by this method and may be added by downstream processors.
    */
   async *parse(sitemapUrlOrData: string | { url: string; xmlData: string } | { url: string; stream: ReadableStream }): AsyncGenerator<SitemapUrl> {
     let sitemapUrl: string;
