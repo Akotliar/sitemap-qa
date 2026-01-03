@@ -54,7 +54,12 @@ export class ExtractorService {
     for (const startUrl of startUrls) {
       for await (const discovered of this.discovery.discover(startUrl)) {
         this.discoveredSitemaps.add(discovered.url);
-        for await (const urlObj of this.parser.parse(discovered)) {
+        // Pass the stream directly to the parser if available
+        const parseInput = discovered.stream 
+          ? { url: discovered.url, stream: discovered.stream }
+          : { url: discovered.url, xmlData: discovered.xmlData };
+          
+        for await (const urlObj of this.parser.parse(parseInput as any)) {
           const normalized = this.normalizeUrl(urlObj.loc);
           if (!this.seenUrls.has(normalized)) {
             this.seenUrls.add(normalized);

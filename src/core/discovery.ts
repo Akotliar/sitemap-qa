@@ -4,6 +4,7 @@ import { XMLParser } from 'fast-xml-parser';
 export interface DiscoveredSitemap {
   url: string;
   xmlData: string;
+  stream?: ReadableStream;
 }
 
 export class DiscoveryService {
@@ -81,6 +82,9 @@ export class DiscoveryService {
         const response = await fetch(currentUrl);
         if (response.status !== 200) continue;
         
+        // We need to peek at the XML to see if it's an index or a leaf.
+        // If it's a leaf, we want to pass the stream to the parser.
+        // If it's an index, we need to parse it here to find more sitemaps.
         const xmlData = await response.text();
         const jsonObj = this.parser.parse(xmlData);
 
@@ -95,7 +99,9 @@ export class DiscoveryService {
             }
           }
         } else if (jsonObj.urlset) {
-          // This is a leaf sitemap - yield both URL and XML data
+          // This is a leaf sitemap - yield the XML data
+          // Note: Since we already called response.text(), we can't use the stream anymore.
+          // For true streaming, we'd need to clone the stream or use a streaming XML parser here too.
           yield { url: currentUrl, xmlData };
         }
       } catch (error) {

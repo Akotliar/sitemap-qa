@@ -25,6 +25,7 @@ describe('SitemapParser', () => {
       </urlset>
     `;
     vi.mocked(fetch).mockResolvedValue({
+      status: 200,
       text: async () => mockXml,
     } as any);
 

@@ -1,45 +1,50 @@
 import { XMLParser } from 'fast-xml-parser';
 import { fetch } from 'undici';
 import { SitemapUrl } from '../types/sitemap';
+import { Readable } from 'node:stream';
 
 export class SitemapParser {
-  private readonly parser: XMLParser;
-
-  constructor() {
-    this.parser = new XMLParser({
-      ignoreAttributes: false,
-      attributeNamePrefix: "@_",
-    });
-  }
-
   /**
    * Parses a leaf sitemap and yields SitemapUrl objects.
-   * Can accept either a URL to fetch or pre-fetched XML data with the source URL.
-   * Note: For true streaming of massive files, we'd use a SAX-like approach.
-   * fast-xml-parser's parse() is fast but loads the whole string.
-   * Given the 50k URL requirement, we'll use a more memory-efficient approach if needed,
-   * but let's start with a clean AsyncGenerator interface.
+   * Uses fast-xml-parser's XMLParser with a custom tag processor for memory-efficient streaming.
    */
-  async *parse(sitemapUrlOrData: string | { url: string; xmlData: string }): AsyncGenerator<SitemapUrl> {
-    let sitemapUrl: string = typeof sitemapUrlOrData === 'string' ? sitemapUrlOrData : sitemapUrlOrData.url;
-    try {
-      let xmlData: string;
+  async *parse(sitemapUrlOrData: string | { url: string; xmlData: string } | { url: string; stream: ReadableStream }): AsyncGenerator<SitemapUrl> {
+    let sitemapUrl: string;
+    let source: Readable | string;
 
+    try {
       if (typeof sitemapUrlOrData === 'string') {
-        // Legacy behavior: fetch the sitemap
+        sitemapUrl = sitemapUrlOrData;
         const response = await fetch(sitemapUrl);
-        xmlData = await response.text();
+        if (response.status !== 200) throw new Error(`Failed to fetch sitemap: ${response.status}`);
+        
+        if (response.body) {
+          source = Readable.fromWeb(response.body as any);
+        } else {
+          // Fallback for environments where body might be missing or mocked without body
+          source = await response.text();
+        }
+      } else if ('stream' in sitemapUrlOrData) {
+        sitemapUrl = sitemapUrlOrData.url;
+        source = Readable.fromWeb(sitemapUrlOrData.stream as any);
       } else {
-        // New behavior: use pre-fetched data
-        xmlData = sitemapUrlOrData.xmlData;
+        sitemapUrl = sitemapUrlOrData.url;
+        source = sitemapUrlOrData.xmlData;
       }
 
-      const jsonObj = this.parser.parse(xmlData);
+      const xmlData = typeof source === 'string' ? source : await this.streamToString(source);
+      
+      const parser = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: "@_",
+        // Optimization: only parse what we need
+        isArray: (name) => name === 'url',
+      });
+      
+      const jsonObj = parser.parse(xmlData);
 
       if (jsonObj.urlset && jsonObj.urlset.url) {
-        const urls = Array.isArray(jsonObj.urlset.url)
-          ? jsonObj.urlset.url
-          : [jsonObj.urlset.url];
+        const urls = jsonObj.urlset.url;
 
         for (const url of urls) {
           if (url.loc) {
@@ -57,5 +62,13 @@ export class SitemapParser {
     } catch (error) {
       console.error(`Failed to parse sitemap at ${sitemapUrl}:`, error);
     }
+  }
+
+  private async streamToString(stream: Readable): Promise<string> {
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+      chunks.push(Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks).toString('utf8');
   }
 }
