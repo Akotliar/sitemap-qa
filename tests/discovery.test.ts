@@ -225,9 +225,7 @@ Disallow: /admin/`;
       const results: string[] = [];
       for await (const discovered of discovery.discover(`https://${testDomain}/sitemap.xml`)) {
         results.push(discovered.url);
-        if (discovered.type === 'xmlData') {
-          expect(discovered.xmlData).toBe(sitemapXml);
-        }
+        expect(discovered.xmlData).toBe(sitemapXml);
       }
 
       expect(results).toHaveLength(1);

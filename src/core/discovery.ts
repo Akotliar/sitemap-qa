@@ -1,15 +1,10 @@
 import { fetch } from 'undici';
 import { XMLParser } from 'fast-xml-parser';
 
-export type DiscoveredSitemap = {
-  type: 'xmlData';
+export interface DiscoveredSitemap {
   url: string;
   xmlData: string;
-} | {
-  type: 'stream';
-  url: string;
-  stream: ReadableStream;
-};
+}
 
 export class DiscoveryService {
   private readonly parser: XMLParser;
@@ -106,7 +101,7 @@ export class DiscoveryService {
           // This is a leaf sitemap - yield the XML data
           // Note: Since we already called response.text(), we can't use the stream anymore.
           // For true streaming, we'd need to clone the stream or use a streaming XML parser here too.
-          yield { type: 'xmlData', url: currentUrl, xmlData };
+          yield { url: currentUrl, xmlData };
         }
       } catch (error) {
         console.error(`Failed to fetch or parse sitemap at ${currentUrl}:`, error);

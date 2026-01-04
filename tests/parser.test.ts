@@ -14,7 +14,7 @@ describe('SitemapParser', () => {
     vi.clearAllMocks();
   });
 
-  it('should fetch and parse sitemap when URL string is provided (legacy path)', async () => {
+  it('should fetch and parse sitemap when URL string is provided (streaming path)', async () => {
     const testDomain = 'parser-test.local';
     const testSitemapUrl = `https://${testDomain}/sitemap.xml`;
     const testPageUrl = `https://${testDomain}/1`;
@@ -24,8 +24,18 @@ describe('SitemapParser', () => {
         <url><loc>${testPageUrl}</loc></url>
       </urlset>
     `;
+    
+    // Create a proper ReadableStream mock to test the streaming code path
+    const mockBody = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(mockXml));
+        controller.close();
+      }
+    });
+    
     vi.mocked(fetch).mockResolvedValue({
       status: 200,
+      body: mockBody,
       text: async () => mockXml,
     } as any);
 
