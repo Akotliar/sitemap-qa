@@ -1,6 +1,7 @@
 import { fetch } from 'undici';
 import { XMLParser } from 'fast-xml-parser';
 import { Readable } from 'node:stream';
+import { gunzipSync } from 'node:zlib';
 
 export interface DiscoveredSitemap {
   url: string;
@@ -97,7 +98,19 @@ export class DiscoveryService {
           clonedResponse = undefined;
         }
         
-        const xmlData = await response.text();
+        const contentType = response.headers?.get('content-type') || '';
+        const isGzip = currentUrl.endsWith('.gz') || 
+                      contentType.includes('gzip') || 
+                      contentType.includes('x-gzip');
+
+        let xmlData: string;
+        if (isGzip && typeof response.arrayBuffer === 'function') {
+          const buffer = await response.arrayBuffer();
+          xmlData = gunzipSync(Buffer.from(buffer)).toString('utf-8');
+        } else {
+          xmlData = await response.text();
+        }
+
         const jsonObj = this.parser.parse(xmlData);
 
         if (jsonObj.sitemapindex) {

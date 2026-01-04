@@ -2,6 +2,7 @@ import { XMLParser } from 'fast-xml-parser';
 import { fetch } from 'undici';
 import { SitemapUrl } from '../types/sitemap';
 import { Readable } from 'node:stream';
+import { gunzipSync, createGunzip } from 'node:zlib';
 
 export class SitemapParser {
   private readonly parser: XMLParser;
@@ -48,20 +49,40 @@ export class SitemapParser {
         const response = await fetch(sitemapUrl);
         if (response.status !== 200) throw new Error(`Failed to fetch sitemap at ${sitemapUrl}: HTTP ${response.status}`);
         
+        const contentType = response.headers?.get('content-type') || '';
+        const isGzip = sitemapUrl.endsWith('.gz') || 
+                      contentType.includes('gzip') || 
+                      contentType.includes('x-gzip');
+
         if (response.body) {
-          source = Readable.fromWeb(response.body);
+          let stream = Readable.fromWeb(response.body);
+          if (isGzip) {
+            stream = stream.pipe(createGunzip());
+          }
+          source = stream;
         } else {
           // Fallback for environments where body might be missing or mocked without body
-          source = await response.text();
+          if (isGzip && typeof response.arrayBuffer === 'function') {
+            const buffer = await response.arrayBuffer();
+            source = gunzipSync(Buffer.from(buffer)).toString('utf-8');
+          } else {
+            source = await response.text();
+          }
         }
       } else if (sitemapUrlOrData.type === 'stream') {
         // Handle both Web ReadableStream and Node.js Readable
+        let stream: Readable;
         if (sitemapUrlOrData.stream instanceof Readable) {
-          source = sitemapUrlOrData.stream;
+          stream = sitemapUrlOrData.stream;
         } else {
           // @ts-expect-error - DOM ReadableStream and node:stream/web ReadableStream are incompatible types but compatible at runtime
-          source = Readable.fromWeb(sitemapUrlOrData.stream);
+          stream = Readable.fromWeb(sitemapUrlOrData.stream);
         }
+
+        if (sitemapUrl.endsWith('.gz')) {
+          stream = stream.pipe(createGunzip());
+        }
+        source = stream;
       } else {
         source = sitemapUrlOrData.xmlData;
       }
