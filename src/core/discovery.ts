@@ -1,9 +1,11 @@
 import { fetch } from 'undici';
 import { XMLParser } from 'fast-xml-parser';
+import { Readable } from 'node:stream';
 
 export interface DiscoveredSitemap {
   url: string;
   xmlData: string;
+  stream?: ReadableStream | Readable;
 }
 
 export class DiscoveryService {
@@ -84,6 +86,17 @@ export class DiscoveryService {
         // We need to peek at the XML to see if it's an index or a leaf.
         // If it's a leaf, we want to pass the stream to the parser.
         // If it's an index, we need to parse it here to find more sitemaps.
+        // Try to clone the response to preserve the stream for leaf sitemaps
+        let clonedResponse: Response | undefined;
+        try {
+          clonedResponse = response.clone();
+        } catch (error) {
+          // Clone might fail if the response body has already been consumed, is locked,
+          // or if clone() is not available in test environments with mocked responses
+          console.warn(`Failed to clone response for ${currentUrl}:`, error);
+          clonedResponse = undefined;
+        }
+        
         const xmlData = await response.text();
         const jsonObj = this.parser.parse(xmlData);
 
@@ -98,10 +111,23 @@ export class DiscoveryService {
             }
           }
         } else if (jsonObj.urlset) {
-          // This is a leaf sitemap - yield the XML data
-          // Note: Since we already called response.text(), we can't use the stream anymore.
-          // For true streaming, we'd need to clone the stream or use a streaming XML parser here too.
-          yield { url: currentUrl, xmlData };
+          // This is a leaf sitemap - yield both the XML data and the stream (if available)
+          // The stream is from the cloned response so it hasn't been consumed yet
+          let stream: Readable | undefined;
+          if (clonedResponse?.body) {
+            try {
+              stream = Readable.fromWeb(clonedResponse.body);
+            } catch (error) {
+              // Stream conversion might fail - log and continue without streaming
+              console.warn(`Failed to convert stream for ${currentUrl}:`, error);
+              stream = undefined;
+            }
+          }
+          yield { 
+            url: currentUrl, 
+            xmlData,
+            stream
+          };
         }
       } catch (error) {
         console.error(`Failed to fetch or parse sitemap at ${currentUrl}:`, error);
