@@ -88,17 +88,13 @@ export class DiscoveryService {
         // If it's an index, we need to parse it here to find more sitemaps.
         // Try to clone the response to preserve the stream for leaf sitemaps
         let clonedResponse: Response | undefined;
-        try {
-          clonedResponse = response.clone();
-        } catch (error) {
-          // Clone might not be available in all environments (e.g., mocked fetch in tests)
-          // In production, clone() should always work on a real Response object
-          if (error instanceof TypeError && error.message.includes('clone')) {
-            // Expected error when clone is not available
-            clonedResponse = undefined;
-          } else {
-            // Unexpected error - log it but continue without streaming
-            console.warn(`Unexpected error cloning response for ${currentUrl}:`, error);
+        if (typeof response.clone === 'function') {
+          try {
+            clonedResponse = response.clone();
+          } catch (error) {
+            // Clone might fail if the response body has already been consumed or is locked
+            // Log the error but continue without streaming
+            console.warn(`Failed to clone response for ${currentUrl}:`, error);
             clonedResponse = undefined;
           }
         }
