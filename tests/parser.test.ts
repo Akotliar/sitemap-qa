@@ -75,6 +75,7 @@ describe('SitemapParser', () => {
     
     const urls = [];
     for await (const url of parser.parse({ 
+      type: 'xmlData',
       url: testSitemapUrl,
       xmlData: unexpectedXml 
     })) {
