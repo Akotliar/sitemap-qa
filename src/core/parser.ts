@@ -18,6 +18,21 @@ export class SitemapParser {
   /**
    * Parses a leaf sitemap and yields SitemapUrl objects.
    * Fetches or reads the full XML into memory and parses it using fast-xml-parser's XMLParser.
+   * 
+   * @param sitemapUrlOrData - Accepts one of three input types:
+   *   - `string`: A URL string. The method will fetch the sitemap from this URL.
+   *     Use this when you need to fetch a sitemap from a remote location.
+   *   - `{ url: string; xmlData: string }`: An object with a URL and pre-fetched XML data.
+   *     Use this when you already have the XML content (e.g., from a cache or file)
+   *     and want to avoid an additional HTTP request.
+   *   - `{ url: string; stream: ReadableStream }`: An object with a URL and a web ReadableStream.
+   *     Use this when you have a stream source (e.g., from a streaming HTTP response)
+   *     that should be consumed and parsed. The web stream is converted to Node.js Readable internally.
+   * 
+   * @yields {SitemapUrl} Parsed sitemap URL entries containing `loc` (URL), `source` (sitemap URL),
+   *   optional metadata (`lastmod`, `changefreq`, `priority`), and a `risks` array (initialized as empty,
+   *   populated later in the processing pipeline). Other properties like `ignored`/`ignoredBy` are not
+   *   set by this method and may be added by downstream processors.
    */
   async *parse(sitemapUrlOrData: string | { url: string; xmlData: string } | { url: string; stream: ReadableStream }): AsyncGenerator<SitemapUrl> {
     let sitemapUrl: string;
