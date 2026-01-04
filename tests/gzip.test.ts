@@ -23,9 +23,15 @@ describe('Gzip Support', () => {
       const discovery = new DiscoveryService();
       const url = 'https://gzip-test.local/sitemap.xml.gz';
 
+      // Ensure we have a clean ArrayBuffer not shared with other tests or pooled
+      const cleanArrayBuffer = gzippedContent.buffer.slice(
+        gzippedContent.byteOffset,
+        gzippedContent.byteOffset + gzippedContent.byteLength
+      );
+
       vi.mocked(fetch).mockResolvedValueOnce({
         status: 200,
-        arrayBuffer: async () => gzippedContent.buffer,
+        arrayBuffer: async () => cleanArrayBuffer,
         text: async () => gzippedContent.toString(),
         headers: new Map([['content-type', 'application/x-gzip']]),
       } as any);
@@ -46,9 +52,14 @@ describe('Gzip Support', () => {
       const parser = new SitemapParser();
       const url = 'https://gzip-test.local/sitemap.xml.gz';
 
+      const cleanArrayBuffer = gzippedContent.buffer.slice(
+        gzippedContent.byteOffset,
+        gzippedContent.byteOffset + gzippedContent.byteLength
+      );
+
       vi.mocked(fetch).mockResolvedValueOnce({
         status: 200,
-        arrayBuffer: async () => gzippedContent.buffer,
+        arrayBuffer: async () => cleanArrayBuffer,
         body: Readable.toWeb(Readable.from(gzippedContent)),
         headers: new Map([['content-type', 'application/x-gzip']]),
       } as any);
