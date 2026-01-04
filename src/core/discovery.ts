@@ -1,9 +1,12 @@
-import { fetch } from 'undici';
+import { fetch, Response } from 'undici';
 import { XMLParser } from 'fast-xml-parser';
+import { Readable } from 'node:stream';
+import { gunzipSync } from 'node:zlib';
 
 export interface DiscoveredSitemap {
   url: string;
   xmlData: string;
+  stream?: ReadableStream | Readable;
 }
 
 export class DiscoveryService {
@@ -81,7 +84,33 @@ export class DiscoveryService {
         const response = await fetch(currentUrl);
         if (response.status !== 200) continue;
         
-        const xmlData = await response.text();
+        // We need to peek at the XML to see if it's an index or a leaf.
+        // If it's a leaf, we want to pass the stream to the parser.
+        // If it's an index, we need to parse it here to find more sitemaps.
+        // Try to clone the response to preserve the stream for leaf sitemaps
+        let clonedResponse: Response | undefined;
+        try {
+          clonedResponse = response.clone();
+        } catch (error) {
+          // Clone might fail if the response body has already been consumed, is locked,
+          // or if clone() is not available in test environments with mocked responses
+          console.warn(`Failed to clone response for ${currentUrl}:`, error);
+          clonedResponse = undefined;
+        }
+        
+        const contentType = response.headers?.get('content-type') || '';
+        const isGzip = currentUrl.endsWith('.gz') || 
+                      contentType.includes('gzip') || 
+                      contentType.includes('x-gzip');
+
+        let xmlData: string;
+        if (isGzip && typeof response.arrayBuffer === 'function') {
+          const buffer = await response.arrayBuffer();
+          xmlData = gunzipSync(Buffer.from(buffer)).toString('utf-8');
+        } else {
+          xmlData = await response.text();
+        }
+
         const jsonObj = this.parser.parse(xmlData);
 
         if (jsonObj.sitemapindex) {
@@ -95,8 +124,23 @@ export class DiscoveryService {
             }
           }
         } else if (jsonObj.urlset) {
-          // This is a leaf sitemap - yield both URL and XML data
-          yield { url: currentUrl, xmlData };
+          // This is a leaf sitemap - yield both the XML data and the stream (if available)
+          // The stream is from the cloned response so it hasn't been consumed yet
+          let stream: Readable | undefined;
+          if (clonedResponse?.body) {
+            try {
+              stream = Readable.fromWeb(clonedResponse.body);
+            } catch (error) {
+              // Stream conversion might fail - log and continue without streaming
+              console.warn(`Failed to convert stream for ${currentUrl}:`, error);
+              stream = undefined;
+            }
+          }
+          yield { 
+            url: currentUrl, 
+            xmlData,
+            stream
+          };
         }
       } catch (error) {
         console.error(`Failed to fetch or parse sitemap at ${currentUrl}:`, error);
