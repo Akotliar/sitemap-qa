@@ -90,9 +90,17 @@ export class DiscoveryService {
         let clonedResponse: Response | undefined;
         try {
           clonedResponse = response.clone();
-        } catch {
+        } catch (error) {
           // Clone might not be available in all environments (e.g., mocked fetch in tests)
-          clonedResponse = undefined;
+          // In production, clone() should always work on a real Response object
+          if (error instanceof TypeError && error.message.includes('clone')) {
+            // Expected error when clone is not available
+            clonedResponse = undefined;
+          } else {
+            // Unexpected error - log it but continue without streaming
+            console.warn(`Unexpected error cloning response for ${currentUrl}:`, error);
+            clonedResponse = undefined;
+          }
         }
         
         const xmlData = await response.text();
