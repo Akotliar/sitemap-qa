@@ -25,9 +25,9 @@ export class SitemapParser {
    *   - `{ url: string; xmlData: string }`: An object with a URL and pre-fetched XML data.
    *     Use this when you already have the XML content (e.g., from a cache or file)
    *     and want to avoid an additional HTTP request.
-   *   - `{ url: string; stream: ReadableStream }`: An object with a URL and a readable stream.
+   *   - `{ url: string; stream: ReadableStream }`: An object with a URL and a web ReadableStream.
    *     Use this when you have a stream source (e.g., from a streaming HTTP response)
-   *     that should be consumed and parsed.
+   *     that should be consumed and parsed. The web stream is converted to Node.js Readable internally.
    * 
    * @yields {SitemapUrl} Parsed sitemap URL entries containing `loc` (URL), `source` (sitemap URL),
    *   optional metadata (`lastmod`, `changefreq`, `priority`), and a `risks` array (initialized as empty,
