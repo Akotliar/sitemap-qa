@@ -1,4 +1,4 @@
-import { fetch } from 'undici';
+import { fetch, Response } from 'undici';
 import { XMLParser } from 'fast-xml-parser';
 import { Readable } from 'node:stream';
 import { gunzipSync } from 'node:zlib';

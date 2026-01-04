@@ -13,7 +13,7 @@ describe('Gzip Support', () => {
   const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://example.com/page1</loc>
+    <loc>https://gzip-test.local/page1</loc>
   </url>
 </urlset>`;
   const gzippedContent = zlib.gzipSync(xmlContent);
@@ -21,12 +21,12 @@ describe('Gzip Support', () => {
   describe('DiscoveryService', () => {
     it('should handle gzipped sitemaps', async () => {
       const discovery = new DiscoveryService();
-      const url = 'https://example.com/sitemap.xml.gz';
+      const url = 'https://gzip-test.local/sitemap.xml.gz';
 
       vi.mocked(fetch).mockResolvedValueOnce({
         status: 200,
         arrayBuffer: async () => gzippedContent.buffer,
-        text: async () => gzippedContent.toString(), // This is what it currently does, which fails
+        text: async () => gzippedContent.toString(),
         headers: new Map([['content-type', 'application/x-gzip']]),
       } as any);
 
@@ -44,7 +44,7 @@ describe('Gzip Support', () => {
   describe('SitemapParser', () => {
     it('should handle gzipped sitemaps from URL', async () => {
       const parser = new SitemapParser();
-      const url = 'https://example.com/sitemap.xml.gz';
+      const url = 'https://gzip-test.local/sitemap.xml.gz';
 
       vi.mocked(fetch).mockResolvedValueOnce({
         status: 200,
@@ -59,7 +59,7 @@ describe('Gzip Support', () => {
       }
 
       expect(urls).toHaveLength(1);
-      expect(urls[0].loc).toBe('https://example.com/page1');
+      expect(urls[0].loc).toBe('https://gzip-test.local/page1');
     });
   });
 });
