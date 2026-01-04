@@ -85,4 +85,39 @@ describe('SitemapParser', () => {
     // Should yield no URLs when the XML doesn't have urlset structure
     expect(urls).toHaveLength(0);
   });
+
+  it('should parse sitemap from a ReadableStream using stream parameter', async () => {
+    const testDomain = 'stream-test.local';
+    const testSitemapUrl = `https://${testDomain}/sitemap.xml`;
+    const testPageUrl = `https://${testDomain}/page1`;
+    
+    const mockXml = `
+      <urlset>
+        <url><loc>${testPageUrl}</loc></url>
+      </urlset>
+    `;
+    
+    // Create a ReadableStream to test the type: 'stream' code path
+    const mockStream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(mockXml));
+        controller.close();
+      }
+    });
+    
+    const urls = [];
+    for await (const url of parser.parse({
+      type: 'stream',
+      url: testSitemapUrl,
+      stream: mockStream
+    })) {
+      urls.push(url);
+    }
+
+    expect(urls).toHaveLength(1);
+    expect(urls[0].loc).toBe(testPageUrl);
+    expect(urls[0].source).toBe(testSitemapUrl);
+    // Verify that fetch was NOT called since we're providing a stream directly
+    expect(fetch).not.toHaveBeenCalled();
+  });
 });
