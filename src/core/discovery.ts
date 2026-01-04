@@ -113,7 +113,16 @@ export class DiscoveryService {
         } else if (jsonObj.urlset) {
           // This is a leaf sitemap - yield both the XML data and the stream (if available)
           // The stream is from the cloned response so it hasn't been consumed yet
-          const stream = clonedResponse?.body ? Readable.fromWeb(clonedResponse.body) : undefined;
+          let stream: Readable | undefined;
+          if (clonedResponse?.body) {
+            try {
+              stream = Readable.fromWeb(clonedResponse.body);
+            } catch (error) {
+              // Stream conversion might fail - log and continue without streaming
+              console.warn(`Failed to convert stream for ${currentUrl}:`, error);
+              stream = undefined;
+            }
+          }
           yield { 
             url: currentUrl, 
             xmlData,
