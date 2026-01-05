@@ -17,9 +17,14 @@ export default defineConfig({
   define: {
     '__PACKAGE_VERSION__': JSON.stringify(packageJson.version),
   },
-  onSuccess: async () => {
+  onSuccess: () => {
     // Copy templates to dist folder
-    cpSync('src/reporters/templates', 'dist/reporters/templates', { recursive: true });
-    console.log('✓ Templates copied to dist/reporters/templates');
+    try {
+      cpSync('src/reporters/templates', 'dist/reporters/templates', { recursive: true });
+      console.log('✓ Templates copied to dist/reporters/templates');
+    } catch (error) {
+      console.error('Failed to copy templates:', error);
+      throw new Error('Build failed: unable to copy template files');
+    }
   },
 });
