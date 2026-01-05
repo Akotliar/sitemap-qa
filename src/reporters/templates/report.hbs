@@ -104,9 +104,19 @@
             justify-content: space-between;
             align-items: center;
         }
+        .category-header .arrow {
+            transition: transform 0.2s;
+            font-size: 12px;
+        }
+        .category-section.collapsed .category-header .arrow {
+            transform: rotate(-90deg);
+        }
         .category-content {
             padding: 20px;
             background-color: #fff;
+        }
+        .category-section.collapsed .category-content {
+            display: none;
         }
 
         .finding-group {
@@ -222,9 +232,9 @@
 
         {{#each categories}}
         <div class="category-section">
-            <div class="category-header">
+            <div class="category-header" onclick="toggleCategory(this)">
                 <span>{{name}} ({{totalUrls}} URLs)</span>
-                <span>▼</span>
+                <span class="arrow">▼</span>
             </div>
             <div class="category-content">
                 {{#each findings}}
@@ -250,6 +260,11 @@
             a.click();
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
+        }
+
+        function toggleCategory(headerElement) {
+            const categorySection = headerElement.parentElement;
+            categorySection.classList.toggle('collapsed');
         }
     </script>
 </body>
