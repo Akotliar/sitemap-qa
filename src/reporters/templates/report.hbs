@@ -264,8 +264,10 @@
         }
 
         function toggleCategory(headerElement) {
-            const categorySection = headerElement.parentElement;
-            categorySection.classList.toggle('collapsed');
+            const categorySection = headerElement.closest('.category-section');
+            if (categorySection) {
+                categorySection.classList.toggle('collapsed');
+            }
         }
     </script>
 </body>
