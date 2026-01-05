@@ -15,7 +15,7 @@ export class HtmlReporter implements Reporter {
 
     // Register helpers
     Handlebars.registerHelper('json', (context) => {
-      return JSON.stringify(context).replace(/"/g, '&quot;');
+      return JSON.stringify(context);
     });
   }
 
