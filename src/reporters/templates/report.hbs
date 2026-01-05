@@ -107,9 +107,10 @@
         .category-header .arrow {
             transition: transform 0.2s;
             font-size: 12px;
+            display: inline-block;
         }
-        .category-section.collapsed .category-header .arrow {
-            transform: rotate(-90deg);
+        .category-section:not(.collapsed) .category-header .arrow {
+            transform: rotate(90deg);
         }
         .category-content {
             padding: 20px;
@@ -234,7 +235,7 @@
         <div class="category-section">
             <div class="category-header" onclick="toggleCategory(this)">
                 <span>{{name}} ({{totalUrls}} URLs)</span>
-                <span class="arrow">▼</span>
+                <span class="arrow">▶</span>
             </div>
             <div class="category-content">
                 {{#each findings}}
