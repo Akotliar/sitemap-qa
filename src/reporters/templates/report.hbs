@@ -173,6 +173,22 @@
             margin-bottom: 15px;
         }
 
+        .details-content {
+            padding: 20px;
+            background: var(--bg-light);
+        }
+
+        .meta-text {
+            color: var(--text-muted);
+            font-size: 11px;
+        }
+
+        .warning-text {
+            color: var(--danger);
+            font-size: 11px;
+            font-weight: bold;
+        }
+
         .btn {
             display: inline-flex;
             align-items: center;
@@ -207,7 +223,7 @@
     <div class="container">
         <details>
             <summary>Sitemaps Discovered ({{discoveredSitemaps.length}})</summary>
-            <div style="padding: 20px; background: var(--bg-light);">
+            <div class="details-content">
                 {{#each discoveredSitemaps}}
                 <div class="url-item">{{this}}</div>
                 {{/each}}
@@ -217,13 +233,13 @@
         {{#if ignoredUrls.length}}
         <details>
             <summary>Ignored URLs ({{ignoredUrls.length}})</summary>
-            <div style="padding: 20px; background: var(--bg-light);">
+            <div class="details-content">
                 {{#each ignoredUrls}}
                 <div class="url-item" title="Ignored by: {{ignoredBy}}">
                     {{loc}} 
-                    <span style="color: var(--text-muted); font-size: 11px;">(by {{ignoredBy}})</span>
+                    <span class="meta-text">(by {{ignoredBy}})</span>
                     {{#if suppressedCategories}}
-                    <span style="color: var(--danger); font-size: 11px; font-weight: bold;">[Suppressed Risks: {{suppressedCategories}}]</span>
+                    <span class="warning-text">[Suppressed Risks: {{suppressedCategories}}]</span>
                     {{/if}}
                 </div>
                 {{/each}}
