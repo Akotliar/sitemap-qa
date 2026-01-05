@@ -1,0 +1,20 @@
+<div class="finding-group">
+    <div class="finding-header">
+        <h4>{{pattern}}</h4>
+        <span class="badge">{{urls.length}} URLs</span>
+    </div>
+    <div class="finding-description">
+        {{reason}}
+    </div>
+    <div class="url-list">
+        {{#each displayUrls}}
+        <div class="url-item">{{this}}</div>
+        {{/each}}
+    </div>
+    {{#if moreCount}}
+    <div class="more-count">... and {{moreCount}} more</div>
+    {{/if}}
+    <button class="btn" onclick="downloadUrls({{json pattern}}, {{json urls}})">
+        📥 Download All {{urls.length}} URLs
+    </button>
+</div>
