@@ -14,7 +14,7 @@
     {{#if moreCount}}
     <div class="more-count">... and {{moreCount}} more</div>
     {{/if}}
-    <button class="btn" onclick="downloadUrls('{{pattern}}', {{json urls}})">
+    <button class="btn" onclick="downloadUrls({{json pattern}}, {{json urls}})">
         📥 Download All {{urls.length}} URLs
     </button>
 </div>
