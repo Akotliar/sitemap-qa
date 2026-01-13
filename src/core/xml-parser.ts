@@ -1,11 +1,21 @@
 import { XMLParser } from 'fast-xml-parser';
 import { Readable } from 'node:stream';
+import { gunzipSync } from 'node:zlib';
 
-export interface XmlParserOptions {
-  onSitemap?: (loc: string) => void;
-  onUrl?: (url: any) => void;
-  onError?: (error: Error) => void;
+export interface SitemapIndexEntry {
+  type: 'sitemap';
+  loc: string;
 }
+
+export interface SitemapUrlEntry {
+  type: 'url';
+  loc: string;
+  lastmod?: string;
+  changefreq?: string;
+  priority?: number;
+}
+
+export type ParsedEntry = SitemapIndexEntry | SitemapUrlEntry;
 
 /**
  * A unified streaming XML parser for sitemaps.
@@ -14,6 +24,7 @@ export interface XmlParserOptions {
  */
 export class StreamingXmlParser {
   private readonly parser: XMLParser;
+  private lastParsedXml?: string;
 
   constructor() {
     this.parser = new XMLParser({
@@ -26,45 +37,49 @@ export class StreamingXmlParser {
   }
 
   /**
-   * Parses an XML stream and calls callbacks for found elements.
-   * Returns the full XML string that was parsed.
+   * Parses an XML stream and yields typed entries as they are found.
+   * Generator-first design allows consumers to process entries without pre-collecting.
    */
-  async parse(stream: Readable | string, options: XmlParserOptions): Promise<string> {
-    try {
-      const xmlData = typeof stream === 'string' ? stream : await this.streamToString(stream);
-      const jsonObj = this.parser.parse(xmlData);
+  async *parse(stream: Readable | string): AsyncGenerator<ParsedEntry> {
+    const xmlData = typeof stream === 'string' ? stream : await this.streamToString(stream);
+    
+    // Store the decompressed XML for consumers who need it
+    this.lastParsedXml = xmlData;
+    
+    const jsonObj = this.parser.parse(xmlData);
 
-      // Handle sitemap index
-      if (jsonObj.sitemapindex && options.onSitemap) {
-        const sitemaps = jsonObj.sitemapindex.sitemap || [];
-
-        for (const sitemap of sitemaps) {
-          if (sitemap?.loc) {
-            options.onSitemap(sitemap.loc);
-          }
+    // Yield sitemap index entries
+    if (jsonObj.sitemapindex?.sitemap) {
+      const sitemaps = jsonObj.sitemapindex.sitemap;
+      for (const sitemap of sitemaps) {
+        if (sitemap?.loc) {
+          yield { type: 'sitemap', loc: sitemap.loc };
         }
-      }
-
-      // Handle leaf sitemap
-      if (jsonObj.urlset && options.onUrl) {
-        const urls = jsonObj.urlset.url || [];
-
-        for (const url of urls) {
-          if (url?.loc) {
-            options.onUrl(url);
-          }
-        }
-      }
-
-      return xmlData;
-    } catch (error) {
-      if (options.onError) {
-        options.onError(error instanceof Error ? error : new Error(String(error)));
-        return typeof stream === 'string' ? stream : ''; // Return what we have or empty
-      } else {
-        throw error;
       }
     }
+
+    // Yield URL entries
+    if (jsonObj.urlset?.url) {
+      const urls = jsonObj.urlset.url;
+      for (const url of urls) {
+        if (url?.loc) {
+          yield {
+            type: 'url',
+            loc: url.loc,
+            lastmod: url.lastmod,
+            changefreq: url.changefreq,
+            priority: url.priority,
+          };
+        }
+      }
+    }
+  }
+  
+  /**
+   * Get the last parsed XML data (useful to avoid re-fetching).
+   */
+  getLastParsedXml(): string | undefined {
+    return this.lastParsedXml;
   }
 
   private async streamToString(stream: Readable): Promise<string> {
@@ -72,6 +87,18 @@ export class StreamingXmlParser {
     for await (const chunk of stream) {
       chunks.push(Buffer.from(chunk));
     }
-    return Buffer.concat(chunks).toString('utf8');
+    const buffer = Buffer.concat(chunks);
+    
+    // Check if content is gzipped (magic number: 1f 8b)
+    if (buffer.length >= 2 && buffer[0] === 0x1f && buffer[1] === 0x8b) {
+      try {
+        const decompressed = gunzipSync(buffer);
+        return decompressed.toString('utf8');
+      } catch (error) {
+        throw new Error(`Failed to decompress gzipped content: ${error}`);
+      }
+    }
+    
+    return buffer.toString('utf8');
   }
 }

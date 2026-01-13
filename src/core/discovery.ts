@@ -84,31 +84,38 @@ export class DiscoveryService {
         let isLeaf = false;
         const childSitemaps: string[] = [];
         
-        let xmlData: string;
-        const options = {
-          onSitemap: (loc: string) => {
-            isIndex = true;
-            childSitemaps.push(loc);
-          },
-          onUrl: () => {
-            isLeaf = true;
-          }
-        };
+        let xmlData: string | undefined;
+        let source: any;
 
         if (response.body) {
-          // Convert Web Stream to Node Stream and parse
+          // Convert Web Stream to Node Stream
           const nodeStream = Readable.fromWeb(response.body as any);
-          xmlData = await this.xmlParser.parse(nodeStream, options);
+          source = nodeStream;
         } else {
           // Fallback for environments/mocks where body is not available
           xmlData = await response.text();
-          await this.xmlParser.parse(xmlData, options);
+          source = xmlData;
+        }
+
+        // Process entries as they're yielded from the parser
+        for await (const entry of this.xmlParser.parse(source)) {
+          if (entry.type === 'sitemap') {
+            isIndex = true;
+            childSitemaps.push(entry.loc);
+          } else if (entry.type === 'url') {
+            isLeaf = true;
+          }
         }
 
         if (isIndex) {
           for (const loc of childSitemaps) {
             queue.push(loc);
           }
+        }
+        
+        // Get xmlData for downstream consumers (parser caches it for us)
+        if (!xmlData) {
+          xmlData = this.xmlParser.getLastParsedXml() || '';
         }
         
         // If it's a leaf, or if it's neither (but has urlset), yield it.

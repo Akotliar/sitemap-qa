@@ -61,23 +61,18 @@ export class SitemapParser {
         source = sitemapUrlOrData.xmlData;
       }
 
-      const urls: SitemapUrl[] = [];
-      
-      await this.xmlParser.parse(source, {
-        onUrl: (url) => {
-          urls.push({
-            loc: url.loc,
+      // Yield URL entries directly from the parser generator
+      for await (const entry of this.xmlParser.parse(source)) {
+        if (entry.type === 'url') {
+          yield {
+            loc: entry.loc,
             source: sitemapUrl,
-            lastmod: url.lastmod,
-            changefreq: url.changefreq,
-            priority: url.priority,
+            lastmod: entry.lastmod,
+            changefreq: entry.changefreq,
+            priority: entry.priority,
             risks: [],
-          });
+          };
         }
-      });
-
-      for (const url of urls) {
-        yield url;
       }
     } catch (error) {
       console.error(`Failed to parse sitemap at ${sitemapUrl}:`, error);
