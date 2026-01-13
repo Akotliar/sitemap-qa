@@ -1,15 +1,15 @@
 import { fetch } from 'undici';
-import { XMLParser } from 'fast-xml-parser';
 import { Readable } from 'node:stream';
+import { ReadableStream } from 'node:stream/web';
+import { StreamingXmlParser } from './xml-parser';
 
 export interface DiscoveredSitemap {
   url: string;
   xmlData: string;
-  stream?: ReadableStream | Readable;
 }
 
 export class DiscoveryService {
-  private readonly parser: XMLParser;
+  private readonly xmlParser: StreamingXmlParser;
   private readonly visited = new Set<string>();
   private readonly STANDARD_PATHS = [
     '/sitemap.xml',
@@ -20,10 +20,7 @@ export class DiscoveryService {
   ];
 
   constructor() {
-    this.parser = new XMLParser({
-      ignoreAttributes: false,
-      attributeNamePrefix: "@_",
-    });
+    this.xmlParser = new StreamingXmlParser();
   }
 
   /**
@@ -83,50 +80,49 @@ export class DiscoveryService {
         const response = await fetch(currentUrl);
         if (response.status !== 200) continue;
         
-        // We need to peek at the XML to see if it's an index or a leaf.
-        // If it's a leaf, we want to pass the stream to the parser.
-        // If it's an index, we need to parse it here to find more sitemaps.
-        // Try to clone the response to preserve the stream for leaf sitemaps
-        let clonedResponse: Response | undefined;
-        try {
-          clonedResponse = response.clone();
-        } catch (error) {
-          // Clone might fail if the response body has already been consumed, is locked,
-          // or if clone() is not available in test environments with mocked responses
-          console.warn(`Failed to clone response for ${currentUrl}:`, error);
-          clonedResponse = undefined;
+        let isIndex = false;
+        let isLeaf = false;
+        const childSitemaps: string[] = [];
+        
+        let xmlData: string | undefined;
+        let source: any;
+
+        if (response.body) {
+          // Convert Web Stream to Node Stream
+          const nodeStream = Readable.fromWeb(response.body as ReadableStream);
+          source = nodeStream;
+        } else {
+          // Fallback for environments/mocks where body is not available
+          xmlData = await response.text();
+          source = xmlData;
+        }
+
+        // Process entries as they're yielded from the parser
+        for await (const entry of this.xmlParser.parse(source)) {
+          if (entry.type === 'sitemap') {
+            isIndex = true;
+            childSitemaps.push(entry.loc);
+          } else if (entry.type === 'url') {
+            isLeaf = true;
+          }
+        }
+
+        if (isIndex) {
+          for (const loc of childSitemaps) {
+            queue.push(loc);
+          }
         }
         
-        const xmlData = await response.text();
-        const jsonObj = this.parser.parse(xmlData);
-
-        if (jsonObj.sitemapindex) {
-          const sitemaps = Array.isArray(jsonObj.sitemapindex.sitemap)
-            ? jsonObj.sitemapindex.sitemap
-            : [jsonObj.sitemapindex.sitemap];
-
-          for (const sitemap of sitemaps) {
-            if (sitemap?.loc) {
-              queue.push(sitemap.loc);
-            }
-          }
-        } else if (jsonObj.urlset) {
-          // This is a leaf sitemap - yield both the XML data and the stream (if available)
-          // The stream is from the cloned response so it hasn't been consumed yet
-          let stream: Readable | undefined;
-          if (clonedResponse?.body) {
-            try {
-              stream = Readable.fromWeb(clonedResponse.body);
-            } catch (error) {
-              // Stream conversion might fail - log and continue without streaming
-              console.warn(`Failed to convert stream for ${currentUrl}:`, error);
-              stream = undefined;
-            }
-          }
+        // Get xmlData for downstream consumers (parser caches it for us)
+        if (!xmlData) {
+          xmlData = this.xmlParser.getLastParsedXml() || '';
+        }
+        
+        // If it's a leaf, or if it's neither (but has urlset), yield it.
+        if (isLeaf || (!isIndex && xmlData.includes('<urlset'))) {
           yield { 
             url: currentUrl, 
             xmlData,
-            stream
           };
         }
       } catch (error) {
@@ -135,3 +131,4 @@ export class DiscoveryService {
     }
   }
 }
+

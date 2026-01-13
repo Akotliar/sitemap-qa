@@ -181,7 +181,7 @@ describe('Reporters', () => {
 
       const call = vi.mocked(fs.writeFile).mock.calls.find(c => c[0] === 'report.html');
       expect(call).toBeDefined();
-      const html = call[1] as string;
+      const html = call![1] as string;
       expect(html).toContain('Cat1');
       expect(html).toContain('Cat2');
       expect(html).toContain('url1');
@@ -208,7 +208,7 @@ describe('Reporters', () => {
 
       const call = vi.mocked(fs.writeFile).mock.calls.find(c => c[0] === 'report.html');
       expect(call).toBeDefined();
-      const html = call[1] as string;
+      const html = call![1] as string;
       expect(html).toContain('Suppressed Risks: SuppressedCat');
       expect(html).toContain('by Policy1');
     });

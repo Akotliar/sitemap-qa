@@ -1,23 +1,19 @@
-import { XMLParser } from 'fast-xml-parser';
-import { fetch } from 'undici';
 import { SitemapUrl } from '../types/sitemap';
 import { Readable } from 'node:stream';
+import { ReadableStream } from 'node:stream/web';
+import { StreamingXmlParser } from './xml-parser';
+import { fetch } from 'undici';
 
 export class SitemapParser {
-  private readonly parser: XMLParser;
+  private readonly xmlParser: StreamingXmlParser;
 
   constructor() {
-    this.parser = new XMLParser({
-      ignoreAttributes: false,
-      attributeNamePrefix: "@_",
-      // Optimization: only parse what we need
-      isArray: (name) => name === 'url',
-    });
+    this.xmlParser = new StreamingXmlParser();
   }
 
   /**
    * Parses a leaf sitemap and yields SitemapUrl objects.
-   * Fetches or reads the full XML into memory and parses it using fast-xml-parser's XMLParser.
+   * Uses the shared StreamingXmlParser for consistent and efficient parsing.
    * 
    * @param sitemapUrlOrData - Accepts one of three input types:
    *   - `string`: A URL string. The method will fetch the sitemap from this URL.
@@ -41,15 +37,15 @@ export class SitemapParser {
       ? sitemapUrlOrData 
       : sitemapUrlOrData.url;
     
-    let source: Readable | string;
-
     try {
+      let source: Readable | string;
+
       if (typeof sitemapUrlOrData === 'string') {
         const response = await fetch(sitemapUrl);
         if (response.status !== 200) throw new Error(`Failed to fetch sitemap at ${sitemapUrl}: HTTP ${response.status}`);
         
         if (response.body) {
-          source = Readable.fromWeb(response.body);
+          source = Readable.fromWeb(response.body as ReadableStream);
         } else {
           // Fallback for environments where body might be missing or mocked without body
           source = await response.text();
@@ -59,44 +55,27 @@ export class SitemapParser {
         if (sitemapUrlOrData.stream instanceof Readable) {
           source = sitemapUrlOrData.stream;
         } else {
-          // @ts-expect-error - DOM ReadableStream and node:stream/web ReadableStream are incompatible types but compatible at runtime
-          source = Readable.fromWeb(sitemapUrlOrData.stream);
+          source = Readable.fromWeb(sitemapUrlOrData.stream as ReadableStream);
         }
       } else {
         source = sitemapUrlOrData.xmlData;
       }
 
-      const xmlData = typeof source === 'string' ? source : await this.streamToString(source);
-      
-      const jsonObj = this.parser.parse(xmlData);
-
-      if (jsonObj.urlset && jsonObj.urlset.url) {
-        const rawUrls = jsonObj.urlset.url;
-        const urls = Array.isArray(rawUrls) ? rawUrls : [rawUrls];
-
-        for (const url of urls) {
-          if (url.loc) {
-            yield {
-              loc: url.loc,
-              source: sitemapUrl,
-              lastmod: url.lastmod,
-              changefreq: url.changefreq,
-              priority: url.priority,
-              risks: [],
-            };
-          }
+      // Yield URL entries directly from the parser generator
+      for await (const entry of this.xmlParser.parse(source)) {
+        if (entry.type === 'url') {
+          yield {
+            loc: entry.loc,
+            source: sitemapUrl,
+            lastmod: entry.lastmod,
+            changefreq: entry.changefreq,
+            priority: entry.priority,
+            risks: [],
+          };
         }
       }
     } catch (error) {
       console.error(`Failed to parse sitemap at ${sitemapUrl}:`, error);
     }
-  }
-
-  private async streamToString(stream: Readable): Promise<string> {
-    const chunks: Buffer[] = [];
-    for await (const chunk of stream) {
-      chunks.push(Buffer.from(chunk));
-    }
-    return Buffer.concat(chunks).toString('utf8');
   }
 }
