@@ -40,6 +40,7 @@ export class SitemapParser {
     try {
       let source: Readable | string;
 
+    try {
       if (typeof sitemapUrlOrData === 'string') {
         const response = await fetch(sitemapUrl);
         if (response.status !== 200) throw new Error(`Failed to fetch sitemap at ${sitemapUrl}: HTTP ${response.status}`);
@@ -59,6 +60,7 @@ export class SitemapParser {
         }
       } else {
         source = sitemapUrlOrData.xmlData;
+        source = sitemapUrlOrData.xmlData;
       }
 
       // Yield URL entries directly from the parser generator
@@ -77,5 +79,13 @@ export class SitemapParser {
     } catch (error) {
       console.error(`Failed to parse sitemap at ${sitemapUrl}:`, error);
     }
+  }
+
+  private async streamToString(stream: Readable): Promise<string> {
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+      chunks.push(Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks).toString('utf8');
   }
 }

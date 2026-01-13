@@ -6,6 +6,7 @@ import { StreamingXmlParser } from './xml-parser';
 export interface DiscoveredSitemap {
   url: string;
   xmlData: string;
+  stream?: ReadableStream | Readable;
 }
 
 export class DiscoveryService {
