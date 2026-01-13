@@ -1,5 +1,6 @@
 import { SitemapUrl } from '../types/sitemap';
 import { Readable } from 'node:stream';
+import { ReadableStream } from 'node:stream/web';
 import { StreamingXmlParser } from './xml-parser';
 import { fetch } from 'undici';
 
@@ -44,7 +45,7 @@ export class SitemapParser {
         if (response.status !== 200) throw new Error(`Failed to fetch sitemap at ${sitemapUrl}: HTTP ${response.status}`);
         
         if (response.body) {
-          source = Readable.fromWeb(response.body as any);
+          source = Readable.fromWeb(response.body as ReadableStream);
         } else {
           // Fallback for environments where body might be missing or mocked without body
           source = await response.text();
@@ -54,8 +55,7 @@ export class SitemapParser {
         if (sitemapUrlOrData.stream instanceof Readable) {
           source = sitemapUrlOrData.stream;
         } else {
-          // @ts-expect-error - DOM ReadableStream and node:stream/web ReadableStream are incompatible types but compatible at runtime
-          source = Readable.fromWeb(sitemapUrlOrData.stream);
+          source = Readable.fromWeb(sitemapUrlOrData.stream as ReadableStream);
         }
       } else {
         source = sitemapUrlOrData.xmlData;

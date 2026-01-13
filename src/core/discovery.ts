@@ -1,5 +1,6 @@
 import { fetch } from 'undici';
 import { Readable } from 'node:stream';
+import { ReadableStream } from 'node:stream/web';
 import { StreamingXmlParser } from './xml-parser';
 
 export interface DiscoveredSitemap {
@@ -88,7 +89,7 @@ export class DiscoveryService {
 
         if (response.body) {
           // Convert Web Stream to Node Stream
-          const nodeStream = Readable.fromWeb(response.body as any);
+          const nodeStream = Readable.fromWeb(response.body as ReadableStream);
           source = nodeStream;
         } else {
           // Fallback for environments/mocks where body is not available
