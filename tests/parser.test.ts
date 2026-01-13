@@ -109,7 +109,7 @@ describe('SitemapParser', () => {
     for await (const url of parser.parse({
       type: 'stream',
       url: testSitemapUrl,
-      stream: mockStream
+      stream: mockStream as any
     })) {
       urls.push(url);
     }

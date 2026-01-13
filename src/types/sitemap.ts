@@ -10,7 +10,7 @@ export interface SitemapUrl {
   source: string;
   lastmod?: string;
   changefreq?: string;
-  priority?: string;
+  priority?: number;
   risks: Risk[];
   ignored?: boolean;
   ignoredBy?: string;

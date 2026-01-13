@@ -55,6 +55,37 @@ describe('Reporters', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal('console', { log: logSpy });
+    vi.mocked(fs.readdir).mockImplementation(async (path: any) => {
+      if (path.toString().includes('partials')) {
+        return ['header.hbs', 'summary.hbs', 'finding.hbs'] as any;
+      }
+      return [] as any;
+    });
+    vi.mocked(fs.readFile).mockImplementation(async (path: any) => {
+      if (path.toString().includes('report.hbs')) {
+        return `
+<!DOCTYPE html>
+<html>
+{{rootUrl}} {{timestamp}}
+{{> summary}}
+{{#each categories}}
+  {{name}}
+  {{#each findings}}
+    {{> finding}}
+  {{/each}}
+{{/each}}
+{{#each ignoredUrls}}
+  {{loc}} 
+  {{#if suppressedCategories}}Suppressed Risks: {{suppressedCategories}}{{/if}}
+  by {{ignoredBy}}
+{{/each}}
+</html>`;
+      }
+      if (path.toString().includes('header.hbs')) return '{{rootUrl}}';
+      if (path.toString().includes('summary.hbs')) return '{{totalUrls}}';
+      if (path.toString().includes('finding.hbs')) return '{{pattern}} {{#each displayUrls}}{{this}}{{/each}}';
+      return '';
+    });
   });
 
   afterEach(() => {
