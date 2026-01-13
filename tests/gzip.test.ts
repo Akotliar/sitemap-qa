@@ -32,7 +32,7 @@ describe('Gzip Support', () => {
       vi.mocked(fetch).mockResolvedValueOnce({
         status: 200,
         arrayBuffer: async () => cleanArrayBuffer,
-        text: async () => gzippedContent.toString(),
+        body: Readable.toWeb(Readable.from(gzippedContent)),
         headers: new Map([['content-type', 'application/x-gzip']]),
       } as any);
 
