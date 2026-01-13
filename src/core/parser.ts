@@ -40,7 +40,6 @@ export class SitemapParser {
     try {
       let source: Readable | string;
 
-    try {
       if (typeof sitemapUrlOrData === 'string') {
         const response = await fetch(sitemapUrl);
         if (response.status !== 200) throw new Error(`Failed to fetch sitemap at ${sitemapUrl}: HTTP ${response.status}`);
