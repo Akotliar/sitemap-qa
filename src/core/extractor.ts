@@ -54,11 +54,8 @@ export class ExtractorService {
     for (const startUrl of startUrls) {
       for await (const discovered of this.discovery.discover(startUrl)) {
         this.discoveredSitemaps.add(discovered.url);
-        // Pass the discovered sitemap to the parser
-        // Prefer stream over xmlData when available
-        const parserInput = discovered.stream
-          ? { type: 'stream' as const, url: discovered.url, stream: discovered.stream }
-          : { type: 'xmlData' as const, url: discovered.url, xmlData: discovered.xmlData };
+        // Pass the discovered sitemap to the parser with buffered xmlData
+        const parserInput = { type: 'xmlData' as const, url: discovered.url, xmlData: discovered.xmlData };
         
         for await (const urlObj of this.parser.parse(parserInput)) {
           const normalized = this.normalizeUrl(urlObj.loc);
