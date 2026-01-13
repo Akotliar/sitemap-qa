@@ -85,7 +85,7 @@ export function generateMockUrls(count: number, domain = 'test.local'): SitemapU
       loc,
       lastmod: '2025-12-12',
       changefreq: 'weekly',
-      priority: '0.5',
+      priority: 0.5,
       source: `https://${domain}/sitemap.xml`,
       risks: []
     });
